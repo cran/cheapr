@@ -1,3 +1,20 @@
-# cheapr 0.1.0
+# cheapr 0.2.0
 
-* CRAN submission.
+* `is_na` has been added as an S3 generic function which is parallelised and  internally falls back
+on `is.na` if there are no suitable methods.
+
+* Additional list utility functions have been added.
+
+* Limited support for `vctrs_rcrd` objects has been added again. 
+
+* `num_na` and similar functions no longer treat empty data frame rows as single observations but instead return the total number of `NA` values in the data frame.
+
+* Fixed a bug in `row_na_counts` and `col_na_counts` that would cause the 
+session to crash when a column variable was a list.
+
+* For the time being, vctrs 'vctrs_rcrd' objects are no longer supported though
+this support may be re-added in the future.
+
+# cheapr 0.1.0 (05-Mar-2024)
+
+* CRAN submission accepted.

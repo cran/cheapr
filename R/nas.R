@@ -1,6 +1,7 @@
 #' Efficient functions for dealing with missing values.
 #'
 #' @description
+#' `is_na()` is a parallelised alternative to `is.na()`. \cr
 #' `num_na(x)` is a faster and more efficient `sum(is.na(x))`. \cr
 #' `which_na(x)` is a more efficient `which(is.na(x))` \cr
 #' `which_not_na(x)` is a more efficient `which(!is.na(x))` \cr
@@ -14,12 +15,28 @@
 #' @details
 #' These functions are designed primarily for programmers, to increase the speed
 #' and memory-efficiency of `NA` handling. \cr
-#' All these functions can be parallelised through `options(cheapr.cores)`. \cr
-#' When `x` is a data frame, `num_na`, `which_na` and `which_not_na` define a
-#' missing value as an empty row with only `NA` values across all columns.
-#' To get the number of `NA` values across an entire data frame,
-#' use `sum(col_na_counts(data))`. \cr
-#' To replicate `complete.cases(x)`, use `!row_any_na(x)`.
+#' Most of these functions can be parallelised through `options(cheapr.cores)`. \cr
+#' When `x` is a list, `num_na`, `any_na` and `all_na` will recurse through a
+#' potentially nested list for `NA` values. \cr
+#'
+#'
+#' For the functions that operate on data frames like `row_na_counts`,
+#' if `x` contains a list-variable, an element of that list is considered to be
+#' `NA` when all nested elements of that list-element contain `NA` values.
+#'
+#' ### Common use-cases
+#' To replicate `complete.cases(x)`, use `!row_any_na(x)`. \cr
+#' To find rows with any empty values,
+#' use `which_(row_any_na(df))`. \cr
+#' To find empty rows use `which_(row_all_na(df))`.
+#'
+#' ### `is_na`
+#' `is_na` Is an S3 generic function. It will internally fall back on
+#' using `is.na` if it can't find a suitable method.
+#' Alternatively you can write your own `is_na` method.
+#' For example there is a method for `vctrs_rcrd`
+#' objects that simply converts it to a data frame and then calls `row_all_na()`.
+#' There is also a `POSIXlt` method for `is_na` that is much faster than `is.na`.
 #'
 #' @param x A vector, matrix or data frame.
 #'
@@ -45,25 +62,58 @@
 #'
 #' df <- airquality[, 1:2]
 #'
-#' # Number of empty rows
+#' # Number of NAs in data
 #' num_na(df)
 #' # Which rows are empty?
-#' which_na(df)
-#' df[which_na(df), ]
+#' row_na <- row_all_na(df)
+#' df[which_(row_na), ]
 #'
 #' # Removing the empty rows
-#' df[which_not_na(df), ]
+#' df[which_(row_na, invert = TRUE), ]
 #'
-#' @rdname num_na
+#' @rdname is_na
 #' @export
-num_na <- cpp_num_na
-#' @rdname num_na
+is_na <- function(x){
+  UseMethod("is_na")
+}
 #' @export
-which_na <- cpp_which_na
-#' @rdname num_na
+is_na.default <- function(x){
+  .Call(`_cheapr_cpp_is_na`, x)
+}
 #' @export
-which_not_na <- cpp_which_not_na
-#' @rdname num_na
+is_na.POSIXlt <- function(x){
+  row_any_na(list_as_df(unclass(x)[1:8]))
+}
+#' @export
+is_na.vctrs_rcrd <- function(x){
+  row_all_na(list_as_df(x))
+}
+#' @rdname is_na
+#' @export
+num_na <- function(x){
+  .Call(`_cheapr_cpp_num_na`, x)
+}
+#' @rdname is_na
+#' @export
+which_na <- function(x){
+  .Call(`_cheapr_cpp_which_na`, x)
+}
+#' @rdname is_na
+#' @export
+which_not_na <- function(x){
+  .Call(`_cheapr_cpp_which_not_na`, x)
+}
+#' @rdname is_na
+#' @export
+any_na <- function(x){
+  .Call(`_cheapr_cpp_any_na`, x)
+}
+#' @rdname is_na
+#' @export
+all_na <- function(x){
+  .Call(`_cheapr_cpp_all_na`, x, TRUE)
+}
+#' @rdname is_na
 #' @export
 row_na_counts <- function(x){
   if (!inherits(x, c("matrix", "data.frame"))){
@@ -75,30 +125,20 @@ row_na_counts <- function(x){
     cpp_row_na_counts(x)
   }
 }
-#' @rdname num_na
+#' @rdname is_na
 #' @export
 col_na_counts <- function(x){
   if (!inherits(x, c("matrix", "data.frame"))){
     stop("x must be a matrix or data frame")
   }
   if (is.matrix(x)){
-    return(cpp_matrix_col_na_counts(x))
-  }
-  n_row <- length(attr(x, "row.names"))
-  n_col <- length(names(x))
-  if (n_row > .Machine$integer.max){
-    out <- numeric(n_col)
+    cpp_matrix_col_na_counts(x)
   } else {
-    out <- integer(n_col)
+    cpp_col_na_counts(x)
   }
-   for (i in seq_len(n_col)){
-    out[i] <- num_na(.subset2(x, i))
-   }
-  # names(out) <- names(x)
-  out
 }
 
-#' @rdname num_na
+#' @rdname is_na
 #' @export
 row_all_na <- function(x){
   if (!inherits(x, c("matrix", "data.frame"))){
@@ -110,7 +150,7 @@ row_all_na <- function(x){
     cpp_missing_row(x, 1, TRUE)
   }
 }
-#' @rdname num_na
+#' @rdname is_na
 #' @export
 col_all_na <- function(x){
   if (!inherits(x, c("matrix", "data.frame"))){
@@ -119,28 +159,10 @@ col_all_na <- function(x){
   if (is.matrix(x)){
     cpp_matrix_missing_col(x, 1, TRUE)
   } else {
-    n_row <- length(attr(x, "row.names"))
-    n_col <- length(names(x))
-    out <- logical(n_col)
-    for (i in seq_len(n_col)){
-      out[i] <- num_na(.subset2(x, i)) == n_row
-    }
-    # names(out) <- names(x)
-    out
+    cpp_missing_col(x, 1, TRUE)
   }
-  # if (!inherits(x, "data.frame")){
-  #   stop("x must be a data frame")
-  # }
-  # n_row <- length(attr(x, "row.names"))
-  # n_col <- length(names(x))
-  # out <- logical(n_col)
-  # for (i in seq_len(n_col)){
-  #   out[i] <- num_na(.subset2(x, i)) == n_row
-  # }
-  # # names(out) <- names(x)
-  # out
 }
-#' @rdname num_na
+#' @rdname is_na
 #' @export
 row_any_na <- function(x){
   if (!inherits(x, c("matrix", "data.frame"))){
@@ -152,7 +174,7 @@ row_any_na <- function(x){
     cpp_missing_row(x, 1, FALSE)
   }
 }
-#' @rdname num_na
+#' @rdname is_na
 #' @export
 col_any_na <- function(x){
   if (!inherits(x, c("matrix", "data.frame"))){
@@ -161,12 +183,6 @@ col_any_na <- function(x){
   if (is.matrix(x)){
     cpp_matrix_missing_col(x, 1, FALSE)
   } else {
-    n_row <- length(attr(x, "row.names"))
-    n_col <- length(names(x))
-    out <- logical(n_col)
-    for (i in seq_len(n_col)){
-      out[i] <- num_na(.subset2(x, i)) > 0
-    }
-    out
+    cpp_missing_col(x, 1, FALSE)
   }
 }

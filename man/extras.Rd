@@ -69,7 +69,7 @@ deframe_(x)
 through the \code{breaks} argument and returns a factor unless \code{labels = FALSE},
 in which case an integer vector of break indices is returned. \cr
 \verb{\%in_\%} and \verb{\%!in_\%} both return a logical vector signifying if the values of
-\code{x} exist or don't exist in \code{table} respectively.
+\code{x} exist or don't exist in \code{table} respectively. \cr
 }
 \description{
 Extra utilities
