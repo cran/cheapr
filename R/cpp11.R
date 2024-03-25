@@ -88,6 +88,10 @@ cpp_dbl_sequence <- function(size, from, by) {
   .Call(`_cheapr_cpp_dbl_sequence`, size, from, by)
 }
 
+cpp_sequence <- function(size, from, by) {
+  .Call(`_cheapr_cpp_sequence`, size, from, by)
+}
+
 cpp_window_sequence <- function(size, k, partial, ascending) {
   .Call(`_cheapr_cpp_window_sequence`, size, k, partial, ascending)
 }
@@ -118,6 +122,18 @@ cpp_new_list <- function(size, default_value) {
 
 cpp_list_rm_null <- function(l) {
   .Call(`_cheapr_cpp_list_rm_null`, l)
+}
+
+cpp_list_as_df <- function(x) {
+  .Call(`_cheapr_cpp_list_as_df`, x)
+}
+
+cpp_set_rm_attributes <- function(x) {
+  .Call(`_cheapr_cpp_set_rm_attributes`, x)
+}
+
+cpp_set_copy_attributes <- function(target, source, attrs) {
+  .Call(`_cheapr_cpp_set_copy_attributes`, target, source, attrs)
 }
 
 cpp_which_ <- function(x, invert) {

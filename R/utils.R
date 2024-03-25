@@ -26,34 +26,16 @@ allv2 <- function(x, value){
   }
   collapse::allv(x, value)
 }
-list_as_df <- function(x){
-  out <- cpp_list_rm_null(x)
-  if (length(out) == 0) {
-    N <- 0L
-  } else {
-    N <- length(out[[1L]])
-  }
-  attr(out, "row.names") <- .set_row_names(N)
-  class(out) <- "data.frame"
-  out
-}
+
+list_as_df <- cpp_list_as_df
+
 df_as_tbl <- function(x){
-  class(x) <- c("tbl_df", "tbl", "data.frame")
-  x
+  out <- list_as_df(x)
+  class(out) <- c("tbl_df", "tbl", "data.frame")
+  out
 }
 as.character.vctrs_rcrd <- function(x, ...){
   format(x, ...)
-}
-# Does rcrd fields have rcrds in them?
-is_nested_rcrd <- function(x){
-  out <- FALSE
-  for (i in seq_along(unclass(x))){
-    if (inherits(.subset2(x, i), "vctrs_rcrd")){
-      out <- TRUE
-      break
-    }
-  }
-  out
 }
 funique.vctrs_rcrd <- function(x, sort = FALSE, ...){
   out <- unique(x, ...)
@@ -70,7 +52,7 @@ funique.POSIXlt <- function(x, ...){
 }
 check_length <- function(x, n){
   if (length(x) != n){
-    stop(paste(deparse1(substitute(x)), "must have length ", n))
+    stop(paste(deparse1(substitute(x)), "must have length", n))
   }
 }
 check_is_df <- function(x){
@@ -94,14 +76,6 @@ which_in <- function(x, table){
 which_not_in <- function(x, table){
   which_na(collapse::fmatch(x, table, overid = 2L, nomatch = NA_integer_))
 }
-df_select <- function(x, i){
-  attrs <- attributes(x)
-  out <- cpp_list_rm_null(unclass(x)[i])
-  attrs[["names"]] <- attr(out, "names")
-  attrs[["row.names"]] <- .row_names_info(x, type = 0L)
-  attributes(out) <- attrs
-  out
-}
 tzone <- function(x){
   out <- attr(x, "tzone")
   if (is.null(out)) {
@@ -111,16 +85,11 @@ tzone <- function(x){
     out[[1]]
   }
 }
+
 # safe_unique <- function(x, ...){
 #   out <- tryCatch(collapse::funique(x, ...), error = function(e) return(".r.error"))
 #   if (length(out) == 1 && out == ".r.error"){
 #     out <- unique(x, ...)
 #   }
 #   out
-# }
-# any_na <- function(x){
-#   num_na(x) > 0
-# }
-# all_na <- function(x){
-#   num_na(x) == unlisted_length(x)
 # }

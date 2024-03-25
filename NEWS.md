@@ -1,4 +1,18 @@
-# cheapr 0.3.0
+# cheapr 0.4.0
+
+* New function `sset` to consistently subset data frame rows and vectors in 
+general.
+
+* `overview` now always returns an object of class "overview". It also returns
+the number of observations instead of rows so that it makes sense 
+for vector summaries as well as data frame summaries.
+
+* `sequence_` has been optimised and rewritten in C++. It now only checks for
+integer overflow when both `from` and `by` are integer vectors.
+
+* The internal function `list_as_df` has been rewritten in C++.
+
+# cheapr 0.3.0 (18-Mar-2024)
 
 * New function `overview` as a cheaper alternative to `summary`.
 
