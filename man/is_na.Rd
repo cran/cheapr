@@ -52,7 +52,7 @@ row_any_na(x)
 col_any_na(x)
 }
 \arguments{
-\item{x}{A vector, matrix or data frame.}
+\item{x}{A vector, list, data frame or matrix.}
 
 \item{recursive}{Should the function be applied recursively to lists?
 The default is \code{TRUE}. Setting this to \code{TRUE} is actually much cheaper because
@@ -85,6 +85,7 @@ To replicate \code{complete.cases(x)}, use \code{!row_any_na(x)}. \cr
 To find rows with any empty values,
 use \code{which_(row_any_na(df))}. \cr
 To find empty rows use \code{which_(row_all_na(df))} or \code{which_na(df)}.
+To drop empty rows use \code{na_rm(df)} or \code{sset(df, which_(row_all_na(df), TRUE))}.
 }
 
 \subsection{\code{is_na}}{

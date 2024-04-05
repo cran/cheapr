@@ -5,6 +5,34 @@
 #include "cpp11/declarations.hpp"
 #include <R_ext/Visibility.h>
 
+// attrs.cpp
+SEXP cpp_set_rm_attributes(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_rm_attributes(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_rm_attributes(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// attrs.cpp
+SEXP cpp_set_add_attr(SEXP x, SEXP which, SEXP value);
+extern "C" SEXP _cheapr_cpp_set_add_attr(SEXP x, SEXP which, SEXP value) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_add_attr(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(which), cpp11::as_cpp<cpp11::decay_t<SEXP>>(value)));
+  END_CPP11
+}
+// attrs.cpp
+SEXP cpp_set_rm_attr(SEXP x, SEXP which);
+extern "C" SEXP _cheapr_cpp_set_rm_attr(SEXP x, SEXP which) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_rm_attr(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(which)));
+  END_CPP11
+}
+// attrs.cpp
+SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add);
+extern "C" SEXP _cheapr_cpp_set_add_attributes(SEXP x, SEXP attributes, SEXP add) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_add_attributes(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(attributes), cpp11::as_cpp<cpp11::decay_t<bool>>(add)));
+  END_CPP11
+}
 // gcd.cpp
 double cpp_gcd2(double x, double y, double tol, bool na_rm);
 extern "C" SEXP _cheapr_cpp_gcd2(SEXP x, SEXP y, SEXP tol, SEXP na_rm) {
@@ -69,6 +97,13 @@ extern "C" SEXP _cheapr_cpp_all_na(SEXP x, SEXP return_true_on_empty, SEXP recur
   END_CPP11
 }
 // nas.cpp
+SEXP cpp_is_na(SEXP x);
+extern "C" SEXP _cheapr_cpp_is_na(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_is_na(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// nas.cpp
 SEXP cpp_which_na(SEXP x);
 extern "C" SEXP _cheapr_cpp_which_na(SEXP x) {
   BEGIN_CPP11
@@ -80,13 +115,6 @@ SEXP cpp_which_not_na(SEXP x);
 extern "C" SEXP _cheapr_cpp_which_not_na(SEXP x) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_which_not_na(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// nas.cpp
-SEXP cpp_is_na(SEXP x);
-extern "C" SEXP _cheapr_cpp_is_na(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_is_na(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
   END_CPP11
 }
 // nas.cpp
@@ -145,6 +173,13 @@ extern "C" SEXP _cheapr_cpp_matrix_missing_col(SEXP x, SEXP threshold, SEXP thre
     return cpp11::as_sexp(cpp_matrix_missing_col(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<double>>(threshold), cpp11::as_cpp<cpp11::decay_t<bool>>(threshold_is_prop)));
   END_CPP11
 }
+// nas.cpp
+SEXP cpp_count_val(SEXP x, SEXP value, bool recursive);
+extern "C" SEXP _cheapr_cpp_count_val(SEXP x, SEXP value, SEXP recursive) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_count_val(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(value), cpp11::as_cpp<cpp11::decay_t<bool>>(recursive)));
+  END_CPP11
+}
 // sequences.cpp
 SEXP cpp_int_sequence(SEXP size, SEXP from, SEXP by);
 extern "C" SEXP _cheapr_cpp_int_sequence(SEXP size, SEXP from, SEXP by) {
@@ -185,6 +220,34 @@ SEXP cpp_lead_sequence(SEXP size, double k, bool partial);
 extern "C" SEXP _cheapr_cpp_lead_sequence(SEXP size, SEXP k, SEXP partial) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_lead_sequence(cpp11::as_cpp<cpp11::decay_t<SEXP>>(size), cpp11::as_cpp<cpp11::decay_t<double>>(k), cpp11::as_cpp<cpp11::decay_t<bool>>(partial)));
+  END_CPP11
+}
+// sset.cpp
+SEXP alt_data1(SEXP x);
+extern "C" SEXP _cheapr_alt_data1(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(alt_data1(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// sset.cpp
+bool is_alt_int_seq(SEXP x);
+extern "C" SEXP _cheapr_is_alt_int_seq(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(is_alt_int_seq(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// sset.cpp
+SEXP cpp_sset_range(SEXP x, R_xlen_t from, R_xlen_t to, R_xlen_t by);
+extern "C" SEXP _cheapr_cpp_sset_range(SEXP x, SEXP from, SEXP to, SEXP by) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_sset_range(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<R_xlen_t>>(from), cpp11::as_cpp<cpp11::decay_t<R_xlen_t>>(to), cpp11::as_cpp<cpp11::decay_t<R_xlen_t>>(by)));
+  END_CPP11
+}
+// sset.cpp
+SEXP cpp_sset_df(SEXP x, SEXP indices);
+extern "C" SEXP _cheapr_cpp_sset_df(SEXP x, SEXP indices) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_sset_df(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(indices)));
   END_CPP11
 }
 // utils.cpp
@@ -229,20 +292,6 @@ extern "C" SEXP _cheapr_cpp_list_as_df(SEXP x) {
     return cpp11::as_sexp(cpp_list_as_df(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
   END_CPP11
 }
-// utils.cpp
-SEXP cpp_set_rm_attributes(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_rm_attributes(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_rm_attributes(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// utils.cpp
-SEXP cpp_set_copy_attributes(SEXP target, SEXP source, SEXP attrs);
-extern "C" SEXP _cheapr_cpp_set_copy_attributes(SEXP target, SEXP source, SEXP attrs) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_copy_attributes(cpp11::as_cpp<cpp11::decay_t<SEXP>>(target), cpp11::as_cpp<cpp11::decay_t<SEXP>>(source), cpp11::as_cpp<cpp11::decay_t<SEXP>>(attrs)));
-  END_CPP11
-}
 // which.cpp
 SEXP cpp_which_(SEXP x, bool invert);
 extern "C" SEXP _cheapr_cpp_which_(SEXP x, SEXP invert) {
@@ -250,12 +299,21 @@ extern "C" SEXP _cheapr_cpp_which_(SEXP x, SEXP invert) {
     return cpp11::as_sexp(cpp_which_(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<bool>>(invert)));
   END_CPP11
 }
+// which.cpp
+SEXP cpp_which_val(SEXP x, SEXP value, bool invert);
+extern "C" SEXP _cheapr_cpp_which_val(SEXP x, SEXP value, SEXP invert) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_which_val(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(value), cpp11::as_cpp<cpp11::decay_t<bool>>(invert)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
+    {"_cheapr_alt_data1",                (DL_FUNC) &_cheapr_alt_data1,                1},
     {"_cheapr_cpp_all_na",               (DL_FUNC) &_cheapr_cpp_all_na,               3},
     {"_cheapr_cpp_any_na",               (DL_FUNC) &_cheapr_cpp_any_na,               2},
     {"_cheapr_cpp_col_na_counts",        (DL_FUNC) &_cheapr_cpp_col_na_counts,        1},
+    {"_cheapr_cpp_count_val",            (DL_FUNC) &_cheapr_cpp_count_val,            3},
     {"_cheapr_cpp_dbl_sequence",         (DL_FUNC) &_cheapr_cpp_dbl_sequence,         3},
     {"_cheapr_cpp_gcd",                  (DL_FUNC) &_cheapr_cpp_gcd,                  5},
     {"_cheapr_cpp_gcd2",                 (DL_FUNC) &_cheapr_cpp_gcd2,                 4},
@@ -281,13 +339,19 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_r_unnested_length",    (DL_FUNC) &_cheapr_cpp_r_unnested_length,    1},
     {"_cheapr_cpp_row_na_counts",        (DL_FUNC) &_cheapr_cpp_row_na_counts,        1},
     {"_cheapr_cpp_sequence",             (DL_FUNC) &_cheapr_cpp_sequence,             3},
-    {"_cheapr_cpp_set_copy_attributes",  (DL_FUNC) &_cheapr_cpp_set_copy_attributes,  3},
+    {"_cheapr_cpp_set_add_attr",         (DL_FUNC) &_cheapr_cpp_set_add_attr,         3},
+    {"_cheapr_cpp_set_add_attributes",   (DL_FUNC) &_cheapr_cpp_set_add_attributes,   3},
+    {"_cheapr_cpp_set_rm_attr",          (DL_FUNC) &_cheapr_cpp_set_rm_attr,          2},
     {"_cheapr_cpp_set_rm_attributes",    (DL_FUNC) &_cheapr_cpp_set_rm_attributes,    1},
+    {"_cheapr_cpp_sset_df",              (DL_FUNC) &_cheapr_cpp_sset_df,              2},
+    {"_cheapr_cpp_sset_range",           (DL_FUNC) &_cheapr_cpp_sset_range,           4},
     {"_cheapr_cpp_vec_length",           (DL_FUNC) &_cheapr_cpp_vec_length,           1},
     {"_cheapr_cpp_which_",               (DL_FUNC) &_cheapr_cpp_which_,               2},
     {"_cheapr_cpp_which_na",             (DL_FUNC) &_cheapr_cpp_which_na,             1},
     {"_cheapr_cpp_which_not_na",         (DL_FUNC) &_cheapr_cpp_which_not_na,         1},
+    {"_cheapr_cpp_which_val",            (DL_FUNC) &_cheapr_cpp_which_val,            3},
     {"_cheapr_cpp_window_sequence",      (DL_FUNC) &_cheapr_cpp_window_sequence,      4},
+    {"_cheapr_is_alt_int_seq",           (DL_FUNC) &_cheapr_is_alt_int_seq,           1},
     {NULL, NULL, 0}
 };
 }

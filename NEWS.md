@@ -1,3 +1,30 @@
+# cheapr 0.5.0
+
+* `sset` is now parallelised when `i` is an 'ALTREP'
+compact integer sequence, e.g. `sset(x, 1:10)`.
+
+* `sset` now has an internal range-based subset method for 
+'ALTREP' integer sequences made using  `:` for example.
+
+* New function `count_val` as a cheaper alternative to e.g. `sum(x == val)`.
+
+* Negative indexing in `sset` has been improved. 
+It is also now partially parallelised.
+
+* Setting `recursive` to false should now be faster.
+
+* 'overview' objects gain an additional list element "print_digits" which 
+is passed to the print method in order to correctly round the summary statistics 
+without affecting the 'cheapr.digits' option globally.
+
+* `factor_` and `na_rm` now handle data frames.
+
+* A bug in `sset.data.table` that caused further set calculations to produce 
+warnings has been fixed.
+
+* `is_na.POSIXlt` and `sset.POSIXlt` have been rewritten to handle unbalanced 
+'POSIXlt' objects.
+
 # cheapr 0.4.0
 
 * New function `sset` to consistently subset data frame rows and vectors in 

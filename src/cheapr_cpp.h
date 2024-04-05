@@ -35,12 +35,17 @@
 
 int num_cores();
 SEXP cpp_which_(SEXP x, bool invert);
-R_xlen_t count_true(int *px, R_xlen_t n);
 SEXP cpp_missing_row(SEXP x, double threshold, bool threshold_is_prop);
 int int_div(int x, int y);
 R_xlen_t cpp_df_nrow(SEXP x);
 R_xlen_t cpp_unnested_length(SEXP x);
 SEXP xlen_to_r(R_xlen_t x);
 R_xlen_t cpp_vec_length(SEXP x);
+SEXP r_address(SEXP x);
+R_xlen_t scalar_count(SEXP x, SEXP value, bool recursive);
+SEXP cpp_list_as_df(SEXP x);
+SEXP cpp_is_na(SEXP x);
+SEXP cpp_which_na(SEXP x);
+SEXP cpp_which_not_na(SEXP x);
 
 #endif

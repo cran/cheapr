@@ -86,10 +86,52 @@ tzone <- function(x){
   }
 }
 
-# safe_unique <- function(x, ...){
-#   out <- tryCatch(collapse::funique(x, ...), error = function(e) return(".r.error"))
-#   if (length(out) == 1 && out == ".r.error"){
-#     out <- unique(x, ...)
-#   }
-#   out
-# }
+# Recycle arguments
+recycle <- function (..., length = NULL){
+  out <- cpp_list_rm_null(list(...))
+  lens <- lengths_(out)
+  uniq_lens <- collapse::fnunique(lens)
+  if (is.null(length)) {
+    if (length(lens)) {
+      N <- max(lens)
+    }
+    else {
+      N <- 0L
+    }
+  }
+  else {
+    N <- length
+  }
+  N <- N * (!collapse::anyv(lens, 0L))
+  recycle <- which_(lens != N)
+  out[recycle] <- lapply(out[recycle], rep_len, N)
+  out
+}
+n_dots <- function(...){
+  nargs()
+}
+set_attr <- cpp_set_add_attr
+set_attrs <- cpp_set_add_attributes
+set_rm_attr <- cpp_set_rm_attr
+set_rm_attrs <- cpp_set_rm_attributes
+
+balance_posixlt <- function(x){
+  balance_pos <- tryCatch(get("balancePOSIXlt",
+                              asNamespace("base"),
+                              inherits = FALSE),
+                          error = function(e) return(".r.error"))
+  if (is.character(balance_pos) && length(balance_pos) == 1 && balance_pos == ".r.error"){
+    unclass(x)
+  } else {
+    balance_pos(x, fill.only = FALSE, classed = FALSE)
+  }
+}
+
+altrep_int_seq_data <- function(x){
+  int_seq_data <- alt_data1(x)
+  size <- int_seq_data[[1L]]
+  from <- int_seq_data[[2L]]
+  by <- int_seq_data[[3L]]
+  to <- from + (max(size - 1L, 0L) * by)
+  list(from = from, to = to, by = by, size = size)
+}
