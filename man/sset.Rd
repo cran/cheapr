@@ -20,15 +20,15 @@ sset(x, ...)
 
 \method{sset}{factor}(x, i, ...)
 
-\method{sset}{data.frame}(x, i, j = seq_along(x), ...)
+\method{sset}{data.frame}(x, i, j, ...)
 
-\method{sset}{tbl_df}(x, i, j = seq_along(x), ...)
+\method{sset}{tbl_df}(x, i, j, ...)
 
 \method{sset}{POSIXlt}(x, i, j, ...)
 
-\method{sset}{data.table}(x, i, j = seq_along(x), ...)
+\method{sset}{data.table}(x, i, j, ...)
 
-\method{sset}{sf}(x, i, j = seq_along(x), ...)
+\method{sset}{sf}(x, i, j, ...)
 }
 \arguments{
 \item{x}{Vector or data frame.}
@@ -38,6 +38,9 @@ sset(x, ...)
 \item{i}{A logical or vector of indices. \cr}
 
 \item{j}{Column indices, names or logical vector.}
+}
+\value{
+A new vector, data frame, list, matrix or other R object.
 }
 \description{
 Cheaper alternative to \code{[} that consistently subsets data frame
@@ -56,14 +59,14 @@ list is always allocated through \code{new_list()}.
 When \code{i} is a logical vector, it is passed directly to \code{which_()}. \cr
 This means that \code{NA} values are ignored and this also means that \code{i}
 is not recycled, so it is good practice to make sure the logical vector
-matches the length of x. To return \code{NA} values, use \code{x[NA_integer_]}.
+matches the length of x. To return \code{NA} values, use \code{sset(x, NA_integer_)}.
 }
 
 \subsection{ALTREP range subsetting}{
 
-When \code{i} is an ALTREP compact integer sequence which can be commonly created
+When \code{i} is an ALTREP compact sequence which can be commonly created
 using e.g. \code{1:10} or using \code{seq_len}, \code{seq_along} and \code{seq.int},
-\code{sset} internally uses a range-based subsetting which is faster and doesn't
+\code{sset} internally uses a range-based subsetting method which is faster and doesn't
 allocate \code{i} into memory.
 }
 }

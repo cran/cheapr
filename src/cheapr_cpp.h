@@ -5,6 +5,7 @@
 #define cheapr_cpp_funs
 
 #define R_NO_REMAP
+#define VECTOR_PTR(x) ((SEXP *) DATAPTR(x))
 #define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
 
 #ifdef _OPENMP
@@ -12,6 +13,9 @@
 #define OMP_NUM_PROCS omp_get_num_procs()
 #define OMP_THREAD_LIMIT omp_get_thread_limit()
 #define OMP_MAX_THREADS omp_get_max_threads()
+#define OMP_PARALLEL _Pragma("omp parallel num_threads(n_cores) ")
+#define OMP_FOR_SIMD _Pragma("omp for simd ")
+#define OMP_PARALLEL_FOR_SIMD	_Pragma("omp parallel for simd num_threads(n_cores) ")
 // #if _OPENMP >= 201307
 //   #define OMP_VER_4
 // #endif
@@ -19,6 +23,9 @@
 #define OMP_NUM_PROCS 1
 #define OMP_THREAD_LIMIT 1
 #define OMP_MAX_THREADS 1
+#define OMP_PARALLEL
+#define OMP_FOR_SIMD
+#define OMP_PARALLEL_FOR_SIMD
 #endif
 
 #define integer_max_ std::numeric_limits<int>::max()

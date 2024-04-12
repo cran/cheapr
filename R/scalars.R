@@ -20,7 +20,7 @@ count_val <- function(x, value, recursive = TRUE){
   cpp_count_val(x, value, recursive)
 }
 val_rm <- function(x, value){
-  n_vals <- count_val(x, value, recursive = TRUE)
+  n_vals <- count_val(x, value, recursive = FALSE)
   if (n_vals == unlisted_length(x)){
     sset(x, 0L)
   } else if (n_vals == 0){
@@ -28,4 +28,7 @@ val_rm <- function(x, value){
   } else {
     sset(x, cpp_which_val(x, value, invert = TRUE))
   }
+}
+which_val <- function(x, value, invert = FALSE){
+  .Call(`_cheapr_cpp_which_val`, x, value, invert)
 }

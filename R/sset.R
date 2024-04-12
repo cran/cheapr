@@ -10,6 +10,9 @@
 #' @param j Column indices, names or logical vector.
 #' @param ... Further parameters passed to `[`.
 #'
+#' @returns
+#' A new vector, data frame, list, matrix or other R object.
+#'
 #' @details
 #' `sset` is an S3 generic.
 #' You can either write methods for `sset` or `[`. \cr
@@ -23,13 +26,13 @@
 #' When `i` is a logical vector, it is passed directly to `which_()`. \cr
 #' This means that `NA` values are ignored and this also means that `i`
 #' is not recycled, so it is good practice to make sure the logical vector
-#' matches the length of x. To return `NA` values, use `x[NA_integer_]`.
+#' matches the length of x. To return `NA` values, use `sset(x, NA_integer_)`.
 #'
 #' ### ALTREP range subsetting
 #'
-#' When `i` is an ALTREP compact integer sequence which can be commonly created
+#' When `i` is an ALTREP compact sequence which can be commonly created
 #' using e.g. `1:10` or using `seq_len`, `seq_along` and `seq.int`,
-#' `sset` internally uses a range-based subsetting which is faster and doesn't
+#' `sset` internally uses a range-based subsetting method which is faster and doesn't
 #' allocate `i` into memory.
 #'
 #' @examples
@@ -67,16 +70,23 @@ sset <- function(x, ...){
 #' @export
 sset.default <- function(x, i, ...){
   if (!missing(i) && is.logical(i)){
+    check_length(i, length(x))
     i <- which_(i)
   }
   # The below line will handle a special but common
   # case of subsetting with a fairly large altrep int sequence
   # For non-classed objects
   if (!is.object(x) && !missing(i) &&
-      is.null(attr(x, "names")) &&
-      is_alt_int_seq(i) && n_dots(...) == 0){
-    int_seq_data <- altrep_int_seq_data(i)
-    cpp_sset_range(x, int_seq_data[[1L]], int_seq_data[[2L]], int_seq_data[[3L]])
+      is_alt_compact_seq(i) && n_dots(...) == 0){
+    int_seq_data <- alt_compact_seq_data(i)
+    from <- int_seq_data[[1]]
+    to <- int_seq_data[[2]]
+    by <- int_seq_data[[3]]
+    out <- cpp_sset_range(x, from, to, by)
+    if (!is.null(names(x))){
+      names(out) <- cpp_sset_range(names(x), from, to, by)
+    }
+    out
   } else {
     x[i, ...]
   }
@@ -99,13 +109,19 @@ sset.Date <- function(x, i, ...){
   # out <- sset.default(unclass(x), i, ...)
   # set_attr(out, "class", oldClass(x))
   if (!missing(i) && is.logical(i)){
+    check_length(i, length(x))
     i <- which_(i)
   }
   if (!missing(i) &&
-      is.null(attr(x, "names")) &&
-      is_alt_int_seq(i) && n_dots(...) == 0){
-    int_seq_data <- altrep_int_seq_data(i)
-    out <- cpp_sset_range(x, int_seq_data[[1L]], int_seq_data[[2L]], int_seq_data[[3L]])
+      is_alt_compact_seq(i) && n_dots(...) == 0){
+    int_seq_data <- alt_compact_seq_data(i)
+    from <- int_seq_data[[1]]
+    to <- int_seq_data[[2]]
+    by <- int_seq_data[[3]]
+    out <- cpp_sset_range(x, from, to, by)
+    if (!is.null(names(x))){
+      set_attr(out, "names", cpp_sset_range(names(x), from, to, by))
+    }
     set_attr(out, "class", oldClass(x))
 
   } else {
@@ -116,13 +132,19 @@ sset.Date <- function(x, i, ...){
 #' @export
 sset.POSIXct <- function(x, i, ...){
   if (!missing(i) && is.logical(i)){
+    check_length(i, length(x))
     i <- which_(i)
   }
   if (!missing(i) &&
-      is.null(attr(x, "names")) &&
-      is_alt_int_seq(i) && n_dots(...) == 0){
-    int_seq_data <- altrep_int_seq_data(i)
-    out <- cpp_sset_range(x, int_seq_data[[1L]], int_seq_data[[2L]], int_seq_data[[3L]])
+      is_alt_compact_seq(i) && n_dots(...) == 0){
+    int_seq_data <- alt_compact_seq_data(i)
+    from <- int_seq_data[[1]]
+    to <- int_seq_data[[2]]
+    by <- int_seq_data[[3]]
+    out <- cpp_sset_range(x, from, to, by)
+    if (!is.null(names(x))){
+      set_attr(out, "names", cpp_sset_range(names(x), from, to, by))
+    }
     set_attr(out, "tzone", attr(x, "tzone"))
     set_attr(out, "class", oldClass(x))
   } else {
@@ -133,13 +155,19 @@ sset.POSIXct <- function(x, i, ...){
 #' @export
 sset.factor <- function(x, i, ...){
   if (!missing(i) && is.logical(i)){
+    check_length(i, length(x))
     i <- which_(i)
   }
   if (!missing(i) &&
-      is.null(attr(x, "names")) &&
-      is_alt_int_seq(i) && n_dots(...) == 0){
-    int_seq_data <- altrep_int_seq_data(i)
-    out <- cpp_sset_range(x, int_seq_data[[1L]], int_seq_data[[2L]], int_seq_data[[3L]])
+      is_alt_compact_seq(i) && n_dots(...) == 0){
+    int_seq_data <- alt_compact_seq_data(i)
+    from <- int_seq_data[[1]]
+    to <- int_seq_data[[2]]
+    by <- int_seq_data[[3]]
+    out <- cpp_sset_range(x, from, to, by)
+    if (!is.null(names(x))){
+      set_attr(out, "names", cpp_sset_range(names(x), from, to, by))
+    }
     set_attr(out, "levels", attr(x, "levels"))
     set_attr(out, "class", oldClass(x))
   } else {
@@ -148,12 +176,12 @@ sset.factor <- function(x, i, ...){
 }
 #' @rdname sset
 #' @export
-sset.data.frame <- function(x, i, j = seq_along(x), ...){
+sset.data.frame <- function(x, i, j, ...){
   df_subset(x, i, j)
 }
 #' @rdname sset
 #' @export
-sset.tbl_df <- function(x, i, j = seq_along(x), ...){
+sset.tbl_df <- function(x, i, j, ...){
   out <- df_subset(x, i, j)
   class(out) <- c("tbl_df", "tbl", "data.frame")
   out
@@ -172,16 +200,16 @@ sset.POSIXlt <- function(x, i, j, ...){
     j <- seq_along(out)
   }
   out <- df_subset(list_as_df(out), i, j)
-  set_rm_attr(out, "row.names")
   if (missingj){
     set_attr(out, "class", class(x))
+    set_rm_attr(out, "row.names")
   }
   set_attr(out, "tzone", attr(x, "tzone"))
   set_attr(out, "balanced", TRUE)
 }
 #' @rdname sset
 #' @export
-sset.data.table <- function(x, i, j = seq_along(x), ...){
+sset.data.table <- function(x, i, j, ...){
   out <- df_subset(x, i, j)
   set_attrs(out, list(
     class = class(x),
@@ -201,7 +229,7 @@ sset.data.table <- function(x, i, j = seq_along(x), ...){
 }
 #' @rdname sset
 #' @export
-sset.sf <- function(x, i, j = seq_along(x), ...){
+sset.sf <- function(x, i, j, ...){
   out <- df_subset(x, i, j)
   source_attrs <- attributes(x)
   source_nms <- names(source_attrs)
@@ -209,25 +237,32 @@ sset.sf <- function(x, i, j = seq_along(x), ...){
   set_attrs(out, attrs_to_keep, add = TRUE)
 }
 df_select <- function(x, j){
-  if (is.logical(j)){
+  j_exists <- !missing(j)
+  if (j_exists && is.logical(j)){
     check_length(j, length(x))
     j <- which_(j)
   }
-  if (is.character(j)){
+  if (j_exists && is.character(j)){
     j <- collapse::fmatch(j, names(x), overid = 2L)
   }
   attrs <- attributes(x)
-  out <- cpp_list_rm_null(unclass(x)[j])
+  if (j_exists){
+    out <- cpp_list_rm_null(.subset(x, j), always_shallow_copy = FALSE)
+  } else {
+    out <- cpp_list_rm_null(x)
+  }
+  # Neater but not as efficient for dfs with many cols
+  # out <- cpp_list_rm_null(unclass(x)[j])
   attrs[["names"]] <- attr(out, "names")
   attrs[["row.names"]] <- .row_names_info(x, type = 0L)
   set_attrs(out, attrs, add = FALSE)
 }
 
 # Efficient data frame subset
-# With the exception of which_() this is surprisingly all base R...
 # It relies on sset which falls back on `[` when no method is found.
-df_subset <- function(x, i, j = seq_along(x)){
+df_subset <- function(x, i, j){
   missingi <- missing(i)
+  missingj <- missing(j)
   nrows <- length(attr(x, "row.names"))
   if (!missingi && is.logical(i)){
     check_length(i, nrows)
@@ -235,27 +270,16 @@ df_subset <- function(x, i, j = seq_along(x)){
   }
 
   ### Subset columns
-
-  out <- df_select(x, j)
-
+  # If j arg is missing, we want to still create a shallow copy
+  # Which we do through df_select()
+  if (!missingj || (missingi && missingj)){
+    out <- df_select(x, j)
+  } else {
+    out <- x
+  }
   ### Subset rows
-
   if (!missingi){
-    i <- as.integer(i)
-    if (length(out) == 0){
-      attr(out, "row.names") <- .set_row_names(
-        length(
-          seq_len(nrows)[i]
-        )
-      )
-    # } else if (is_alt_int_seq(i)){
-    #   out <- list_as_df(
-    #     lapply(out, sset, i)
-    #   )
-    # } else {
-    } else {
-      out <- cpp_sset_df(out, i)
-    }
+    out <- cpp_sset_df(out, as.integer(i))
   }
   out
 }

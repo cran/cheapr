@@ -126,12 +126,6 @@ balance_posixlt <- function(x){
     balance_pos(x, fill.only = FALSE, classed = FALSE)
   }
 }
-
-altrep_int_seq_data <- function(x){
-  int_seq_data <- alt_data1(x)
-  size <- int_seq_data[[1L]]
-  from <- int_seq_data[[2L]]
-  by <- int_seq_data[[3L]]
-  to <- from + (max(size - 1L, 0L) * by)
-  list(from = from, to = to, by = by, size = size)
+cpp_list_rm_null <- function(x, always_shallow_copy = TRUE){
+  cpp_drop_null(x, always_shallow_copy)
 }

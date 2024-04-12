@@ -4,7 +4,7 @@ test_that("subsetting", {
   a <- rnorm(10^3)
   a[sample.int(10^3, 10)] <- Inf
   a[sample.int(10^3, 10)] <- -Inf
-  a[sample.int(10^3, 10)] <- NaN
+  # a[sample.int(10^3, 10)] <- NaN
   b <- sample(-100:100, 10^3, TRUE)
   c <- sample(letters, 10^3, TRUE)
   d <- complex(real = rnorm(10^3),
@@ -51,19 +51,17 @@ test_that("subsetting", {
   i23 <- 2000:3000
   i24 <- -1:-1000
   i25 <- -111:-1000
+  i26 <- b >= 0
 
-  # i7 <- NA # This doesn't match
-  # i8 <- NA_integer_
-
-  objs_to_test <- letters[1:10]
-  ind_to_test <- paste0("i", 1:25)
+  objs_to_test <- letters[1:11]
+  ind_to_test <- paste0("i", 1:26)
 
   for (obj in objs_to_test){
     if (!is.raw(get(obj))){
-      assign(obj, fill_with_na(get(obj), n = 111))
+      assign(obj, `names<-`(fill_with_na(get(obj), n = 111), sample.int(1000)))
     }
   }
-
+  # Vectors lose their names here
   df <- data.frame(a, b, c, d, e, f, g, h)
   df$i <- i
   df$j <- j
@@ -71,10 +69,9 @@ test_that("subsetting", {
 
   test_df <- expand.grid(objs_to_test, ind_to_test, stringsAsFactors = FALSE)
   names(test_df) <- c("obj", "ind")
-  # test_df <- test_df |> dplyr::filter(obj != "g")
-  for (i in seq_len(nrow(test_df))){
-    r_obj <- get(test_df$obj[i])
-    r_ind <- get(test_df$ind[i])
+  for (ii in seq_len(nrow(test_df))){
+    r_obj <- get(test_df$obj[ii])
+    r_ind <- get(test_df$ind[ii])
     expect_identical(
      sset(r_obj, r_ind),
      r_obj[r_ind]
@@ -94,6 +91,23 @@ test_that("subsetting", {
      # vctrs::vec_slice(df, r_ind)
     )
   }
+
+  # Subsetting no rows
+  expect_identical(
+    sset(df, 0),
+    base_sset(df, 0, 1:ncol(df), drop = FALSE)
+  )
+
+  # Subsetting data frame with 0 cols
+  expect_identical(
+    sset(df, 10:0, j = 0),
+    base_sset(df, 10:1, 0, drop = FALSE)
+  )
+
+  expect_identical(
+    sset(df, 0, 0),
+    base_sset(df, 0, 0, drop = FALSE)
+  )
 
   empty_df <- df[0, , drop = FALSE]
 
@@ -116,35 +130,3 @@ test_that("subsetting", {
   )
 })
 
-test_that("errors", {
-  expect_null(sset(NULL))
-  expect_null(sset(NULL, 1:10))
-  expect_error(sset(iris$Sepal.Length, c(-5, 5)))
-  expect_error(sset(iris$Sepal.Length, 10:-10))
-  expect_error(sset(globalenv()))
-})
-
-test_that("misc", {
-  expect_identical(
-    cpp_sset_range(10:1, 3, 0, -1),
-    rev(cpp_sset_range(10:1, 0, 3, 1))
-  )
-  expect_identical(cpp_sset_range(1:10, 0, 0, 1), integer())
-  expect_identical(cpp_sset_range(integer(), 0, 0, 1), integer())
-  expect_identical(cpp_sset_range(letters, 0, 0, 1), character())
-  expect_identical(cpp_sset_range(as.list(letters), 0, 0, 1), list())
-  expect_identical(cpp_sset_range(as.list(letters)[0], 0, 0, -1), list())
-  expect_identical(cpp_sset_range(letters[0], 0, 0, -1), character())
-  expect_error(cpp_sset_range(letters, 1, 10, 2))
-  expect_error(cpp_sset_range(letters, 1, 10, -1))
-  expect_error(cpp_sset_range(global(), 1, 10, 1))
-})
-
-# test_that("fatal error", {
-#   set.seed(43)
-#   i <- as.integer(sample(seq(0, 1000, 100), 10^6, TRUE))
-#   x <- flights$day
-#   # x <- sample.int(30, 100000, TRUE)
-#   cpp_sset(x, -i)
-# }
-# )

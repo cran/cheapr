@@ -124,12 +124,72 @@ cpp_lead_sequence <- function(size, k, partial) {
   .Call(`_cheapr_cpp_lead_sequence`, size, k, partial)
 }
 
-alt_data1 <- function(x) {
-  .Call(`_cheapr_alt_data1`, x)
+cpp_sequence_id <- function(size) {
+  .Call(`_cheapr_cpp_sequence_id`, size)
 }
 
-is_alt_int_seq <- function(x) {
-  .Call(`_cheapr_is_alt_int_seq`, x)
+cpp_set_abs <- function(x) {
+  .Call(`_cheapr_cpp_set_abs`, x)
+}
+
+cpp_set_floor <- function(x) {
+  .Call(`_cheapr_cpp_set_floor`, x)
+}
+
+cpp_set_ceiling <- function(x) {
+  .Call(`_cheapr_cpp_set_ceiling`, x)
+}
+
+cpp_set_trunc <- function(x) {
+  .Call(`_cheapr_cpp_set_trunc`, x)
+}
+
+cpp_set_change_sign <- function(x) {
+  .Call(`_cheapr_cpp_set_change_sign`, x)
+}
+
+cpp_set_exp <- function(x) {
+  .Call(`_cheapr_cpp_set_exp`, x)
+}
+
+cpp_set_sqrt <- function(x) {
+  .Call(`_cheapr_cpp_set_sqrt`, x)
+}
+
+cpp_set_add <- function(x, y) {
+  .Call(`_cheapr_cpp_set_add`, x, y)
+}
+
+cpp_set_subtract <- function(x, y) {
+  .Call(`_cheapr_cpp_set_subtract`, x, y)
+}
+
+cpp_set_multiply <- function(x, y) {
+  .Call(`_cheapr_cpp_set_multiply`, x, y)
+}
+
+cpp_set_divide <- function(x, y) {
+  .Call(`_cheapr_cpp_set_divide`, x, y)
+}
+
+cpp_set_pow <- function(x, y) {
+  .Call(`_cheapr_cpp_set_pow`, x, y)
+}
+
+cpp_set_log <- function(x, base) {
+  .Call(`_cheapr_cpp_set_log`, x, base)
+}
+
+cpp_set_round <- function(x, digits) {
+  .Call(`_cheapr_cpp_set_round`, x, digits)
+}
+
+is_alt_compact_seq <- function(x) {
+  .Call(`_cheapr_is_alt_compact_seq`, x)
+}
+
+alt_compact_seq_data <- function(x) {
+  .Call(`_cheapr_alt_compact_seq_data`, x)
 }
 
 cpp_sset_range <- function(x, from, to, by) {
@@ -156,8 +216,8 @@ cpp_new_list <- function(size, default_value) {
   .Call(`_cheapr_cpp_new_list`, size, default_value)
 }
 
-cpp_list_rm_null <- function(l) {
-  .Call(`_cheapr_cpp_list_rm_null`, l)
+cpp_drop_null <- function(l, always_shallow_copy) {
+  .Call(`_cheapr_cpp_drop_null`, l, always_shallow_copy)
 }
 
 cpp_list_as_df <- function(x) {

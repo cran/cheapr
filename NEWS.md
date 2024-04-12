@@ -1,3 +1,20 @@
+# cheapr 0.8.0
+
+* New 'set' Math operations inspired by 'data.table' and 'collapse' 
+that transform data by reference.
+
+* Fixed an inconsistency of when `sequence_()` would error when supplied with 
+a zero-length size argument.
+
+* Fixed a protection stack imbalance in `count_val(x)` when `x` is `NULL`.
+
+* `sset` has been optimised for wide data frames with many variables. 
+It is also faster when applied to a data frame with dates, date-times and factors.
+
+* In `sset`, when `i` is a logical vector it must match the length of x.
+
+* `sset` can now handle 'ALTREP' compact real sequences as well.
+
 # cheapr 0.5.0
 
 * `sset` is now parallelised when `i` is an 'ALTREP'
