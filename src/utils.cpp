@@ -1,6 +1,4 @@
 #include "cheapr_cpp.h"
-#include <cpp11.hpp>
-#include <Rinternals.h>
 
 int int_div(int x, int y){
   return x / y;
@@ -178,6 +176,11 @@ SEXP r_address(SEXP x) {
   static char buf[1000];
   snprintf(buf, 1000, "%p", (void*) x);
   return Rf_mkChar(buf);
+}
+
+[[cpp11::register]]
+SEXP r_copy(SEXP x){
+  return Rf_duplicate(x);
 }
 
 // Potentially useful for rolling calculations
