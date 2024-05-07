@@ -13,6 +13,9 @@
 #' @param ordered_result See `?cut`.
 #' @param table See `?collapse::fmatch`
 #' @param ... See `?cut`.
+#' @param size See `?sample`.
+#' @param replace See `?sample`.
+#' @param prob See `?sample`.
 #'
 #' @returns
 #' `enframe()_` converts a vector to a data frame. \cr
@@ -25,7 +28,11 @@
 #' `%in_%` and `%!in_%` both return a logical vector signifying if the values of
 #' `x` exist or don't exist in `table` respectively. \cr
 #' `na_rm()` is a convenience function that removes `NA` values and
-#' works only on vectors. For more advanced `NA` handling, see `?is_na`.
+#' empty rows in the case of data frames.
+#' For more advanced `NA` handling, see `?is_na`. \cr
+#' `sample_()` is an alternative to `sample()` that natively samples
+#' data frame rows through `sset()`. It also does not have a special case when
+#' `length(x)` is 1.
 #'
 #' @details
 #' `intersect_()` and `setdiff_()` are faster and more efficient
@@ -168,4 +175,9 @@ na_rm <- function(x){
   } else {
     sset(x, which_not_na(x))
   }
+}
+#' @export
+#' @rdname extras
+sample_ <- function(x, size = cpp_vec_length(x), replace = FALSE, prob = NULL){
+  sset(x, sample.int(cpp_vec_length(x), size, replace, prob))
 }

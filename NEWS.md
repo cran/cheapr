@@ -1,4 +1,15 @@
-# cheapr 0.9.0
+# cheapr 0.9.1
+
+* New function `recycle` to help recycle R objects to a common size.
+
+* The `set` functions that update by reference are now ALTREP aware and
+take a copy when the input is an ALTREP object.
+
+* New function `lag2_` as a generalised solution for complex lags. It supports
+dynamic lag vectors, lags using an order vector, and custom run lengths. 
+It doesn't support updating by reference or long vectors.
+
+# cheapr 0.9.0 (22-Apr-2024)
 
 * New function `lag_` for very fast lags and leads on vectors and data frames.
 It includes a `set` argument allowing users to create a lagged vector 
@@ -6,7 +17,7 @@ by reference without copies.
 
 * `set_round` has been amended to improve floating point accuracy.
 
-# cheapr 0.8.0
+# cheapr 0.8.0 (12-Apr-2024)
 
 * New 'set' Math operations inspired by 'data.table' and 'collapse' 
 that transform data by reference.
@@ -23,7 +34,7 @@ It is also faster when applied to a data frame with dates, date-times and factor
 
 * `sset` can now handle 'ALTREP' compact real sequences as well.
 
-# cheapr 0.5.0
+# cheapr 0.5.0 (5-Apr-2024)
 
 * `sset` is now parallelised when `i` is an 'ALTREP'
 compact integer sequence, e.g. `sset(x, 1:10)`.
@@ -50,7 +61,7 @@ warnings has been fixed.
 * `is_na.POSIXlt` and `sset.POSIXlt` have been rewritten to handle unbalanced 
 'POSIXlt' objects.
 
-# cheapr 0.4.0
+# cheapr 0.4.0 (25-Mar-2024)
 
 * New function `sset` to consistently subset data frame rows and vectors in 
 general.

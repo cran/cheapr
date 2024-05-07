@@ -1,5 +1,10 @@
 #include "cheapr_cpp.h"
 
+
+template<typename T> T cpp_sign(T x) {
+  return (x > 0) - (x < 0);
+}
+
 [[cpp11::register]]
 double cpp_gcd2(double x, double y, double tol, bool na_rm){
   double zero = 0.0;
@@ -127,7 +132,7 @@ SEXP cpp_gcd(SEXP x, double tol, bool na_rm, bool break_early, bool round){
         break;
       }
       if (break_early && agcd > 0.0 && agcd < (tol + tol)){
-        gcd = tol * ( (gcd > 0) - (gcd < 0)); // tol * sign(gcd)
+        gcd = tol * cpp_sign<double>(gcd);
         break;
       }
     }
@@ -161,7 +166,7 @@ SEXP cpp_lcm(SEXP x, double tol, bool na_rm){
       lcm = NA_REAL;
     }
     int lcm_int = p_x[0];
-    double int_max = double(integer_max_);
+    double int_max = integer_max_;
     for (int i = 1; i < n; ++i) {
       if (!na_rm && !(lcm == lcm)){
         lcm = NA_REAL;

@@ -9,6 +9,7 @@
 \alias{enframe_}
 \alias{deframe_}
 \alias{na_rm}
+\alias{sample_}
 \title{Extra utilities}
 \usage{
 setdiff_(x, y, dups = TRUE)
@@ -35,6 +36,8 @@ enframe_(x, name = "name", value = "value")
 deframe_(x)
 
 na_rm(x)
+
+sample_(x, size = cpp_vec_length(x), replace = FALSE, prob = NULL)
 }
 \arguments{
 \item{x}{A vector or data frame.}
@@ -62,6 +65,12 @@ na_rm(x)
 \item{name}{The column name to assign the names of a vector.}
 
 \item{value}{The column name to assign the values of a vector.}
+
+\item{size}{See \code{?sample}.}
+
+\item{replace}{See \code{?sample}.}
+
+\item{prob}{See \code{?sample}.}
 }
 \value{
 \verb{enframe()_} converts a vector to a data frame. \cr
@@ -74,7 +83,11 @@ in which case an integer vector of break indices is returned. \cr
 \verb{\%in_\%} and \verb{\%!in_\%} both return a logical vector signifying if the values of
 \code{x} exist or don't exist in \code{table} respectively. \cr
 \code{na_rm()} is a convenience function that removes \code{NA} values and
-works only on vectors. For more advanced \code{NA} handling, see \code{?is_na}.
+empty rows in the case of data frames.
+For more advanced \code{NA} handling, see \code{?is_na}. \cr
+\code{sample_()} is an alternative to \code{sample()} that natively samples
+data frame rows through \code{sset()}. It also does not have a special case when
+\code{length(x)} is 1.
 }
 \description{
 Extra utilities
