@@ -88,6 +88,9 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
   if (Rf_length(value) != 1){
     Rf_error("value must be a vector of length 1");
   }
+  if (Rf_isVectorList(x)){
+    Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
+  }
   SEXP val_is_na = Rf_protect(cpp_is_na(value));
   ++n_protections;
   if (Rf_asLogical(val_is_na)){
@@ -157,7 +160,7 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
     ++n_protections;
     SEXP val = Rf_protect(Rf_asChar(value));
     ++n_protections;
-    SEXP *p_x = STRING_PTR(x);
+    const SEXP *p_x = STRING_PTR_RO(x);
     if (is_long){
       double *p_out = REAL(out);
       WHICH_VAL(val);
@@ -173,7 +176,6 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-
 }
 
 // 2 more which() alternatives
