@@ -24,6 +24,10 @@ cpp_set_add_attributes <- function(x, attributes, add) {
   .Call(`_cheapr_cpp_set_add_attributes`, x, attributes, add)
 }
 
+cpp_character_compare <- function(x, y, op) {
+  .Call(`_cheapr_cpp_character_compare`, x, y, op)
+}
+
 cpp_gcd2 <- function(x, y, tol, na_rm) {
   .Call(`_cheapr_cpp_gcd2`, x, y, tol, na_rm)
 }
@@ -46,6 +50,26 @@ cpp_gcd2_vectorised <- function(x, y, tol, na_rm) {
 
 cpp_lcm2_vectorised <- function(x, y, tol, na_rm) {
   .Call(`_cheapr_cpp_lcm2_vectorised`, x, y, tol, na_rm)
+}
+
+cpp_int64_to_int <- function(x) {
+  .Call(`_cheapr_cpp_int64_to_int`, x)
+}
+
+cpp_int64_to_double <- function(x) {
+  .Call(`_cheapr_cpp_int64_to_double`, x)
+}
+
+cpp_int64_to_numeric <- function(x) {
+  .Call(`_cheapr_cpp_int64_to_numeric`, x)
+}
+
+cpp_numeric_to_int64 <- function(x) {
+  .Call(`_cheapr_cpp_numeric_to_int64`, x)
+}
+
+cpp_format_numeric_as_int64 <- function(x) {
+  .Call(`_cheapr_cpp_format_numeric_as_int64`, x)
 }
 
 cpp_lag <- function(x, k, fill, set, recursive) {
@@ -76,14 +100,6 @@ cpp_list_as_df <- function(x) {
   .Call(`_cheapr_cpp_list_as_df`, x)
 }
 
-cpp_check_nested_lengths <- function(x, y) {
-  invisible(.Call(`_cheapr_cpp_check_nested_lengths`, x, y))
-}
-
-cpp_cast_common <- function(x, y) {
-  .Call(`_cheapr_cpp_cast_common`, x, y)
-}
-
 cpp_num_na <- function(x, recursive) {
   .Call(`_cheapr_cpp_num_na`, x, recursive)
 }
@@ -100,20 +116,20 @@ cpp_is_na <- function(x) {
   .Call(`_cheapr_cpp_is_na`, x)
 }
 
-cpp_which_na <- function(x) {
-  .Call(`_cheapr_cpp_which_na`, x)
+cpp_df_row_na_counts <- function(x) {
+  .Call(`_cheapr_cpp_df_row_na_counts`, x)
 }
 
-cpp_which_not_na <- function(x) {
-  .Call(`_cheapr_cpp_which_not_na`, x)
+cpp_df_col_na_counts <- function(x) {
+  .Call(`_cheapr_cpp_df_col_na_counts`, x)
 }
 
-cpp_row_na_counts <- function(x) {
-  .Call(`_cheapr_cpp_row_na_counts`, x)
+cpp_col_any_na <- function(x, names) {
+  .Call(`_cheapr_cpp_col_any_na`, x, names)
 }
 
-cpp_col_na_counts <- function(x) {
-  .Call(`_cheapr_cpp_col_na_counts`, x)
+cpp_col_all_na <- function(x, names) {
+  .Call(`_cheapr_cpp_col_all_na`, x, names)
 }
 
 cpp_matrix_row_na_counts <- function(x) {
@@ -124,12 +140,20 @@ cpp_matrix_col_na_counts <- function(x) {
   .Call(`_cheapr_cpp_matrix_col_na_counts`, x)
 }
 
+cpp_row_na_counts <- function(x, names) {
+  .Call(`_cheapr_cpp_row_na_counts`, x, names)
+}
+
+cpp_col_na_counts <- function(x, names) {
+  .Call(`_cheapr_cpp_col_na_counts`, x, names)
+}
+
 cpp_count_val <- function(x, value, recursive) {
   .Call(`_cheapr_cpp_count_val`, x, value, recursive)
 }
 
-cpp_val_replace <- function(x, value, replace, set) {
-  .Call(`_cheapr_cpp_val_replace`, x, value, replace, set)
+cpp_val_replace <- function(x, value, replace, recursive) {
+  .Call(`_cheapr_cpp_val_replace`, x, value, replace, recursive)
 }
 
 cpp_int_sequence <- function(size, from, by) {
@@ -232,10 +256,26 @@ r_copy <- function(x) {
   .Call(`_cheapr_r_copy`, x)
 }
 
+var_sum_squared_diff <- function(x, mu) {
+  .Call(`_cheapr_var_sum_squared_diff`, x, mu)
+}
+
+cpp_bin <- function(x, breaks, codes, right, include_lowest, include_oob) {
+  .Call(`_cheapr_cpp_bin`, x, breaks, codes, right, include_lowest, include_oob)
+}
+
 cpp_which_ <- function(x, invert) {
   .Call(`_cheapr_cpp_which_`, x, invert)
 }
 
 cpp_which_val <- function(x, value, invert) {
   .Call(`_cheapr_cpp_which_val`, x, value, invert)
+}
+
+cpp_which_na <- function(x) {
+  .Call(`_cheapr_cpp_which_na`, x)
+}
+
+cpp_which_not_na <- function(x) {
+  .Call(`_cheapr_cpp_which_not_na`, x)
 }

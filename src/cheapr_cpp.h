@@ -8,8 +8,15 @@
 #define R_NO_REMAP
 #endif
 
+#ifndef VECTOR_PTR
 #define VECTOR_PTR(x) ((SEXP *) DATAPTR(x))
+#endif
+#ifndef VECTOR_PTR_RO
 #define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
+#endif
+#ifndef INTEGER64_PTR
+#define INTEGER64_PTR(x) ((long long*) REAL(x))
+#endif
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -32,8 +39,45 @@
 #define integer_max_ std::numeric_limits<int>::max()
 #endif
 
-#ifndef is_na_cplx
-#define is_na_cplx(x) (bool) (x.r != x.r) || (x.i != x.i)
+#ifndef cheapr_is_na_int
+#define cheapr_is_na_int(x) ((bool) (x == NA_INTEGER))
+#endif
+
+#ifndef cheapr_is_na_str
+#define cheapr_is_na_str(x) ((bool) (x == NA_STRING))
+#endif
+
+#ifndef cheapr_is_na_cplx
+#define cheapr_is_na_cplx(x) ((bool) (x.r != x.r) || (x.i != x.i))
+#endif
+
+#ifndef cheapr_is_na_dbl
+#define cheapr_is_na_dbl(x) ((bool) (x != x))
+#endif
+
+#ifndef NA_INTEGER64
+#define NA_INTEGER64 LLONG_MIN
+#endif
+
+#ifndef cheapr_is_na_int64
+#define cheapr_is_na_int64(x) ((bool) (x == NA_INTEGER64))
+#endif
+
+#ifndef CHEAPR_INT_TO_INT64
+#define CHEAPR_INT_TO_INT64(x) ((long long int) (x == NA_INTEGER ? NA_INTEGER64 : x))
+#endif
+#ifndef CHEAPR_DBL_TO_INT64
+#define CHEAPR_DBL_TO_INT64(x) ((long long int) (x != x ? NA_INTEGER64 : x))
+#endif
+#ifndef CHEAPR_INT64_TO_INT
+#define CHEAPR_INT64_TO_INT(x) ((int) (x == NA_INTEGER64 ? NA_INTEGER : x))
+#endif
+#ifndef CHEAPR_INT64_TO_DBL
+#define CHEAPR_INT64_TO_DBL(x) ((double) (x == NA_INTEGER64 ? NA_REAL : x))
+#endif
+
+#ifndef CHEAPR_OMP_THRESHOLD
+#define CHEAPR_OMP_THRESHOLD 100000
 #endif
 
 int num_cores();
@@ -57,5 +101,9 @@ bool is_compact_seq(SEXP x);
 void cpp_copy_names(SEXP source, SEXP target);
 R_xlen_t na_count(SEXP x, bool recursive);
 bool cpp_any_na(SEXP x, bool recursive);
+bool is_int64(SEXP x);
+SEXP cpp_int64_to_double(SEXP x);
+SEXP cpp_numeric_to_int64(SEXP x);
+SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add);
 
 #endif

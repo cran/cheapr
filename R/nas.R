@@ -138,40 +138,12 @@ all_na <- function(x, recursive = TRUE){
 #' @rdname is_na
 #' @export
 row_na_counts <- function(x, names = FALSE){
-  if (!inherits(x, c("matrix", "data.frame"))){
-    stop("x must be a matrix or data frame")
-  }
-  if (is.matrix(x)){
-    out <- cpp_matrix_row_na_counts(x)
-    if (names){
-      names(out) <- rownames(x)
-    }
-  } else {
-    out <- cpp_row_na_counts(x)
-    if (names){
-      names(out) <- rownames(x)
-    }
-  }
-  out
+  cpp_row_na_counts(x, names)
 }
 #' @rdname is_na
 #' @export
 col_na_counts <- function(x, names = FALSE){
-  if (!inherits(x, c("matrix", "data.frame"))){
-    stop("x must be a matrix or data frame")
-  }
-  if (is.matrix(x)){
-    out <- cpp_matrix_col_na_counts(x)
-    if (names){
-      names(out) <- colnames(x)
-    }
-  } else {
-    out <- cpp_col_na_counts(x)
-    if (names){
-      names(out) <- names(x)
-    }
-  }
-  out
+  cpp_col_na_counts(x, names)
 }
 
 #' @rdname is_na
@@ -187,10 +159,10 @@ col_all_na <- function(x, names = FALSE){
 #' @rdname is_na
 #' @export
 row_any_na <- function(x, names = FALSE){
-  row_na_counts(x, names = names) > 0L
+  row_na_counts(x, names = names) != 0L
 }
 #' @rdname is_na
 #' @export
 col_any_na <- function(x, names = FALSE){
-  col_na_counts(x, names = names) > 0L
+  col_na_counts(x, names = names) != 0L
 }

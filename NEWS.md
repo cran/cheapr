@@ -1,6 +1,45 @@
-# cheapr
+# cheapr 0.9.8
 
-* Range based subsetting, e.g. `sset(x, 1:10)` should now be faster.
+* New scalar functions have been added and some renamed. Most are now
+prefixed with 'val_' or 'na_' in the case of `NA` specific scalar functions.
+
+* New cheap functions for binning continuous data into discrete bins. 
+These include `get_breaks`, `as_discrete` and `bin`.
+`get_breaks` finds 'pretty' break-points of numeric data very quickly.
+`as_discrete` converts numeric data to discrete categories as a factor.
+`bin` is a low-level function for binning numeric data into the correct
+bins. It can also efficiently return the corresponding break values 
+instead of the break indices through `codes = FALSE`.
+
+* New function `na_insert` to randomly insert `NA` values into a vector.
+
+* New function `vector_length` as a hybrid between `length` and `nrow`.
+
+* `gcd` and `scm` now make use of 64-bit integers internally and can accept
+'integer64' objects. `scm` used to return `NA` once the 32-bit integer limit
+of 2^31 - 1 was reached if the input was an integer vector. 
+This has now been increased to the 64-bit integer limit, 
+which is approximately 9.223372e+18 and errors if that limit is exceeded.
+
+* 'integer64' objects are now lightly supported. They are not 
+supported in any sequence functions or in the 'set_math' functions.
+
+* New functions `new_df` and `named_list`.
+
+* All factor levels utilities now begin with the prefix 'levels_'.
+
+* New cheap factor functions `as_factor`, `levels_add_na`, `levels_drop_na`, 
+`levels_drop` and `levels_reorder`.
+
+* `lag_` now uses `memmove` where possible.
+
+* Fixed an issue where `lag_(x)` was materialising x twice if x was an ALTREP 
+integer sequence.
+
+# cheapr 0.9.3 (29-Jul-2024)
+
+* Range based subsetting, e.g. `sset(x, 1:10)` should now be faster as `memmove` 
+is used where possible.
 
 * New functions `val_count` and `which_val` for common scalar operations.
 

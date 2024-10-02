@@ -16,6 +16,10 @@
 #' @param size See `?sample`.
 #' @param replace See `?sample`.
 #' @param prob See `?sample`.
+#' @param n Number of scalar values (or `NA`) to insert
+#' randomly into your vector.
+#' @param prop Proportion of scalar values (or `NA`) values to insert
+#' randomly into your vector.
 #'
 #' @returns
 #' `enframe()_` converts a vector to a data frame. \cr
@@ -27,12 +31,15 @@
 #' in which case an integer vector of break indices is returned. \cr
 #' `%in_%` and `%!in_%` both return a logical vector signifying if the values of
 #' `x` exist or don't exist in `table` respectively. \cr
-#' `na_rm()` is a convenience function that removes `NA` values and
-#' empty rows in the case of data frames.
-#' For more advanced `NA` handling, see `?is_na`. \cr
 #' `sample_()` is an alternative to `sample()` that natively samples
 #' data frame rows through `sset()`. It also does not have a special case when
 #' `length(x)` is 1. \cr
+#' `val_insert` inserts scalar values randomly into your vector.
+#' Useful for replacing lots of data with a single value. \cr
+#' `na_insert` inserts `NA` values randomly into your vector.
+#' Useful for generating missing data. \cr
+#' `vector_length` behaves mostly like `NROW()` except
+#' for matrices in which it matches `length()`.
 #'
 #' @details
 #' `intersect_()` and `setdiff_()` are faster and more efficient
@@ -110,12 +117,22 @@ cut_numeric <- function(x, breaks, labels = NULL, include.lowest = FALSE,
     codes.only <- TRUE
   else if (length(labels) != nb - 1L)
     stop("number of intervals and length of 'labels' differ")
-  code <- .bincode(x, breaks, right, include.lowest)
+  code <- cpp_bin(x, breaks, codes = TRUE, right = right,
+                  include_lowest = include.lowest, include_oob = FALSE)
+  # code <- .bincode(x, breaks, right, include.lowest)
   if (!codes.only) {
     levels(code) <- as.character(labels)
     class(code) <- c(if (ordered_result) "ordered" else character(0), "factor")
   }
   code
+}
+#' @export
+#' @rdname extras
+cut.integer64 <- function(x, ...){
+
+  ## Would be nice if cut() accepted a formatting function
+  ## As large int64 are printed with sci notation
+  cut_numeric(cpp_int64_to_numeric(x), ...)
 }
 #' @export
 #' @rdname extras
@@ -163,21 +180,33 @@ deframe_ <- function(x){
 }
 #' @export
 #' @rdname extras
-na_rm <- function(x){
-  n_na <- num_na(x, recursive = TRUE)
-  if (n_na == unlisted_length(x)){
-    sset(x, 0L)
-  } else if (n_na == 0){
-    x
-  } else {
-    sset(x, which_not_na(x))
-  }
+sample_ <- function(x, size = vector_length(x), replace = FALSE, prob = NULL){
+  sset(x, sample.int(vector_length(x), size, replace, prob))
 }
 #' @export
 #' @rdname extras
-sample_ <- function(x, size = cpp_vec_length(x), replace = FALSE, prob = NULL){
-  sset(x, sample.int(cpp_vec_length(x), size, replace, prob))
+val_insert <- function(x, value, n = NULL, prop = NULL){
+  if (!is.null(n) && !is.null(prop)) {
+    stop("either n or prop must be supplied")
+  }
+  if (!is.null(n)){
+    x[sample.int(length(x), size = n, replace = FALSE)] <- value
+  }
+  if (!is.null(prop)) {
+    x[sample.int(length(x), size = floor(prop * length(x)),
+                 replace = FALSE)] <- value
+  }
+  x
 }
+#' @export
+#' @rdname extras
+na_insert <- function(x, n = NULL, prop = NULL){
+  val_insert(x, value = NA, n = n, prop = prop)
+}
+#' @export
+#' @rdname extras
+vector_length <- cpp_vec_length
+
 # head_ <- function(x, n = 1L){
 #   check_length(n, 1L)
 #   N <- cpp_vec_length(x)
@@ -213,4 +242,39 @@ sample_ <- function(x, size = cpp_vec_length(x), replace = FALSE, prob = NULL){
 #     assign(".Random.seed", old, envir = globalenv())
 #   })
 #   eval(expr, envir = parent.frame())
+# }
+duplicated_ <- function(x, .all = FALSE){
+  groups <- collapse::group(x, starts = !.all, group.sizes = TRUE)
+  sizes <- attr(groups, "group.sizes")
+  out <- (sizes > 1L)[groups]
+  out[attr(groups, "starts")] <- FALSE
+  out
+}
+
+# duplicates <- function(x, .all = FALSE, .count = FALSE){
+#   groups <- collapse::group(x, starts = !.all, group.sizes = TRUE)
+#   sizes <- attr(groups, "group.sizes")
+#   starts <- attr(groups, "starts")
+#   dup <- (sizes > 1L)[groups]
+#   dup[starts] <- FALSE
+#   which_dup <- which_(dup)
+#   out <- sset(x, which_dup)
+#
+#   # Adjust group sizes as they reflect the dup count + 1
+#
+#   if (.count){
+#     sizes <- sizes[groups]
+#     if (!.all && NROW(out) > 0){
+#       set_subtract(sizes, 1L)
+#       which_zero <- which_val(sizes, 0L)
+#       collapse::setv(
+#         sizes,
+#         which_zero,
+#         1L,
+#         vind1 = TRUE
+#       )
+#     }
+#     cpp_set_add_attr(out, "n_dupes", sset(sizes, which_dup))
+#   }
+#   out
 # }

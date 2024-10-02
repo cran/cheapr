@@ -115,57 +115,53 @@ SEXP cpp_list_as_df(SEXP x) {
   } else {
     N = cpp_vec_length(VECTOR_ELT(out, 0));
   }
-  SEXP df_str = Rf_protect(Rf_ScalarString(Rf_mkChar("data.frame")));
+  SEXP df_str = Rf_protect(Rf_mkString("data.frame"));
+  SEXP row_names;
   if (N > 0){
-    SEXP row_names = Rf_protect(Rf_allocVector(INTSXP, 2));
+    row_names = Rf_protect(Rf_allocVector(INTSXP, 2));
     INTEGER(row_names)[0] = NA_INTEGER;
     INTEGER(row_names)[1] = -N;
-    Rf_setAttrib(out, R_RowNamesSymbol, row_names);
-    Rf_classgets(out, df_str);
-    Rf_unprotect(3);
-    return out;
   } else {
-    SEXP row_names = Rf_protect(Rf_allocVector(INTSXP, 0));
-    Rf_setAttrib(out, R_RowNamesSymbol, row_names);
-    Rf_classgets(out, df_str);
-    Rf_unprotect(3);
-    return out;
+    row_names = Rf_protect(Rf_allocVector(INTSXP, 0));
   }
+  Rf_setAttrib(out, R_RowNamesSymbol, row_names);
+  Rf_classgets(out, df_str);
+  Rf_unprotect(3);
+  return out;
 }
 
-[[cpp11::register]]
-void cpp_check_nested_lengths(SEXP x, SEXP y){
-  R_xlen_t n1 = Rf_xlength(x);
-  R_xlen_t n2 = Rf_xlength(y);
-  if (n1 != n2){
-    Rf_error("x and y must have the same length");
-  }
-  if (Rf_isVectorList(x) && Rf_isVectorList(y)){
-    R_xlen_t n3, n4;
-    const SEXP *p_x = VECTOR_PTR_RO(x);
-    const SEXP *p_y = VECTOR_PTR_RO(y);
-
-    for (R_xlen_t i = 0; i < n1; ++i){
-      bool xlist = Rf_isVectorList(p_x[i]);
-      bool ylist = Rf_isVectorList(p_y[i]);
-      int both_lists = xlist + ylist;
-      if (both_lists == 1){
-        Rf_error("x and y must have identical nested lengths");
-      } else if (both_lists == 2){
-        // Recurse back through the same function at this point
-        cpp_check_nested_lengths(p_x[i], p_y[i]);
-      } else {
-        n3 = Rf_xlength(p_x[i]);
-        n4 = Rf_xlength(p_y[i]);
-        if (n3 != n4){
-          Rf_error("x and y must have identical nested lengths");
-        }
-      }
-    }
-  } else if (!(!Rf_isVectorList(x) && !Rf_isVectorList(y))){
-    Rf_error("x and y must either be both lists or both not lists");
-  }
-}
+// void cpp_check_nested_lengths(SEXP x, SEXP y){
+//   R_xlen_t n1 = Rf_xlength(x);
+//   R_xlen_t n2 = Rf_xlength(y);
+//   if (n1 != n2){
+//     Rf_error("x and y must have the same length");
+//   }
+//   if (Rf_isVectorList(x) && Rf_isVectorList(y)){
+//     R_xlen_t n3, n4;
+//     const SEXP *p_x = VECTOR_PTR_RO(x);
+//     const SEXP *p_y = VECTOR_PTR_RO(y);
+//
+//     for (R_xlen_t i = 0; i < n1; ++i){
+//       bool xlist = Rf_isVectorList(p_x[i]);
+//       bool ylist = Rf_isVectorList(p_y[i]);
+//       int both_lists = xlist + ylist;
+//       if (both_lists == 1){
+//         Rf_error("x and y must have identical nested lengths");
+//       } else if (both_lists == 2){
+//         // Recurse back through the same function at this point
+//         cpp_check_nested_lengths(p_x[i], p_y[i]);
+//       } else {
+//         n3 = Rf_xlength(p_x[i]);
+//         n4 = Rf_xlength(p_y[i]);
+//         if (n3 != n4){
+//           Rf_error("x and y must have identical nested lengths");
+//         }
+//       }
+//     }
+//   } else if (!(!Rf_isVectorList(x) && !Rf_isVectorList(y))){
+//     Rf_error("x and y must either be both lists or both not lists");
+//   }
+// }
 
 // SEXP cpp_shallow_copy(SEXP x){
 //   if (Rf_isVectorList(x)){
@@ -185,45 +181,44 @@ void cpp_check_nested_lengths(SEXP x, SEXP y){
 
 // #define cheapr_cast_temp(x, y) cpp11::function cpp11::package("cheapr")["cheapr_cast"];
 
-[[cpp11::register]]
-SEXP cpp_cast_common(SEXP x, SEXP y){
-  // All length checks will have been done above..
-  // Maybe inefficient but makes things simpler
-  R_xlen_t n = Rf_xlength(x);
-  cpp11::function cheapr_cast = cpp11::package("cheapr")["cheapr_cast"];
-  int n_prot = 0;
-  SEXP out = Rf_protect(Rf_allocVector(VECSXP, 2));
-  ++n_prot;
-  if (Rf_isVectorList(x) && Rf_isVectorList(y)){
-    // SEXP a = Rf_protect(cpp_shallow_copy(x));
-    SEXP a = Rf_protect(Rf_shallow_duplicate(x));
-    ++n_prot;
-    SEXP b = Rf_protect(Rf_shallow_duplicate(y));
-    // SEXP b = Rf_protect(cpp_shallow_copy(y));
-    ++n_prot;
-    const SEXP *p_x = VECTOR_PTR_RO(a);
-    const SEXP *p_y = VECTOR_PTR_RO(b);
-
-    for (R_xlen_t i = 0; i < n; ++i){
-      bool xlist = Rf_isVectorList(p_x[i]);
-      bool ylist = Rf_isVectorList(p_y[i]);
-      if (xlist && ylist){
-        // Recurse back through the same function at this point
-        SEXP temp = Rf_protect(cpp_cast_common(p_x[i], p_y[i]));
-        ++n_prot;
-        SET_VECTOR_ELT(a, i, VECTOR_ELT(temp, 0));
-        SET_VECTOR_ELT(b, i, VECTOR_ELT(temp, 1));
-      } else {
-        SET_VECTOR_ELT(a, i, cheapr_cast(p_x[i], p_y[i]));
-        SET_VECTOR_ELT(b, i, cheapr_cast(p_y[i], p_x[i]));
-      }
-    }
-    SET_VECTOR_ELT(out, 0, a);
-    SET_VECTOR_ELT(out, 1, b);
-  } else {
-    SET_VECTOR_ELT(out, 0, cheapr_cast(x, y));
-    SET_VECTOR_ELT(out, 1, cheapr_cast(y, x));
-  }
-  Rf_unprotect(n_prot);
-  return out;
-}
+// SEXP cpp_cast_common(SEXP x, SEXP y){
+//   // All length checks will have been done above..
+//   // Maybe inefficient but makes things simpler
+//   R_xlen_t n = Rf_xlength(x);
+//   cpp11::function cheapr_cast = cpp11::package("cheapr")["cheapr_cast"];
+//   int n_prot = 0;
+//   SEXP out = Rf_protect(Rf_allocVector(VECSXP, 2));
+//   ++n_prot;
+//   if (Rf_isVectorList(x) && Rf_isVectorList(y)){
+//     // SEXP a = Rf_protect(cpp_shallow_copy(x));
+//     SEXP a = Rf_protect(Rf_shallow_duplicate(x));
+//     ++n_prot;
+//     SEXP b = Rf_protect(Rf_shallow_duplicate(y));
+//     // SEXP b = Rf_protect(cpp_shallow_copy(y));
+//     ++n_prot;
+//     const SEXP *p_x = VECTOR_PTR_RO(a);
+//     const SEXP *p_y = VECTOR_PTR_RO(b);
+//
+//     for (R_xlen_t i = 0; i < n; ++i){
+//       bool xlist = Rf_isVectorList(p_x[i]);
+//       bool ylist = Rf_isVectorList(p_y[i]);
+//       if (xlist && ylist){
+//         // Recurse back through the same function at this point
+//         SEXP temp = Rf_protect(cpp_cast_common(p_x[i], p_y[i]));
+//         ++n_prot;
+//         SET_VECTOR_ELT(a, i, VECTOR_ELT(temp, 0));
+//         SET_VECTOR_ELT(b, i, VECTOR_ELT(temp, 1));
+//       } else {
+//         SET_VECTOR_ELT(a, i, cheapr_cast(p_x[i], p_y[i]));
+//         SET_VECTOR_ELT(b, i, cheapr_cast(p_y[i], p_x[i]));
+//       }
+//     }
+//     SET_VECTOR_ELT(out, 0, a);
+//     SET_VECTOR_ELT(out, 1, b);
+//   } else {
+//     SET_VECTOR_ELT(out, 0, cheapr_cast(x, y));
+//     SET_VECTOR_ELT(out, 1, cheapr_cast(y, x));
+//   }
+//   Rf_unprotect(n_prot);
+//   return out;
+// }

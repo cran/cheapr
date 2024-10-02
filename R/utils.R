@@ -1,3 +1,10 @@
+#' @noRd
+
+# Like deparse1 but has a cutoff in case of massive strings
+deparse2 <- function(expr, collapse = " ", width.cutoff = 500L, nlines = 5L, ...){
+  paste(deparse(expr, width.cutoff, nlines = nlines, ...), collapse = collapse)
+}
+
 is_integerable <- function(x){
   abs(x) <= .Machine$integer.max
 }
@@ -7,19 +14,7 @@ all_integerable <- function(x, shift = 0){
     na.rm = TRUE
   )
 }
-fill_with_na <- function(x, n = NULL, prop = NULL){
-  if (!is.null(n) && !is.null(prop)) {
-    stop("either n or prop must be supplied")
-  }
-  if (!is.null(n)) {
-    x[sample.int(length(x), size = n, replace = FALSE)] <- NA
-  }
-  if (!is.null(prop)) {
-    x[sample.int(length(x), size = floor(prop * length(x)),
-                 replace = FALSE)] <- NA
-  }
-  x
-}
+
 allv2 <- function(x, value){
   if (!length(x)) {
     return(FALSE)
@@ -29,19 +24,14 @@ allv2 <- function(x, value){
 
 list_as_df <- cpp_list_as_df
 
-df_as_tbl <- function(x){
-  out <- list_as_df(x)
-  class(out) <- c("tbl_df", "tbl", "data.frame")
-  out
-}
 check_length <- function(x, n){
   if (length(x) != n){
-    stop(paste(deparse1(substitute(x)), "must have length", n))
+    stop(paste(deparse2(substitute(x)), "must have length", n))
   }
 }
 check_is_df <- function(x){
   if (!inherits(x, "data.frame")){
-    stop(paste(deparse1(substitute(x)), "must be a data frame."))
+    stop(paste(deparse2(substitute(x)), "must be a data frame."))
   }
 }
 df_add_cols <- function(data, cols){
@@ -78,9 +68,6 @@ cheapr_rep_len <- function(x, length.out){
   }
 }
 
-n_dots <- function(...){
-  nargs()
-}
 set_attr <- cpp_set_add_attr
 set_attrs <- cpp_set_add_attributes
 set_rm_attr <- cpp_set_rm_attr
@@ -152,4 +139,35 @@ funique.POSIXlt <- function(x, sort = FALSE, ...){
   attributes(out) <- out_attrs
   class(out) <- class(x)
   out
+}
+
+
+n_dots <- function(...){
+  nargs()
+}
+
+# Keep this in-case anyone was using it
+fill_with_na <- na_insert
+
+# Basically if x is integer no vector conversion to double happens
+cheapr_var <- function(x, na.rm = TRUE){
+  if (is.integer(x)){
+    y <- as.integer(x)
+  } else {
+    y <- as.double(x)
+  }
+  if (na.rm){
+    N <- (length(y) - na_count(y)) - 1
+  } else {
+    N <- length(y) - 1
+  }
+  mu <- collapse::fmean(y, na.rm = na.rm)
+  if (length(mu) < 1 || any_na(mu)){
+    NA_real_
+  } else {
+    var_sum_squared_diff(y, as.double(mu)) /  N
+  }
+}
+cheapr_sd <- function(x, na.rm = TRUE){
+  sqrt(cheapr_var(x, na.rm = na.rm))
 }

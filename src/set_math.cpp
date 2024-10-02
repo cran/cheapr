@@ -27,6 +27,15 @@ SEXP check_transform_altrep(SEXP x){
   }
 }
 
+#define CHEAPR_MATH_INT_LOOP(_fun_)                                         \
+for (R_xlen_t i = 0; i < n; ++i) {                                          \
+  p_out[i] = p_out[i] == NA_INTEGER ? p_out[i] : _fun_(p_out[i]);           \
+}                                                                           \
+
+#define CHEAPR_MATH_REAL_LOOP(_fun_)                                      \
+for (R_xlen_t i = 0; i < n; ++i) {                                        \
+  p_out[i] = p_out[i] != p_out[i] ? p_out[i] : _fun_(p_out[i]);           \
+}                                                                         \
 
 // Convert integer vector to plain double vector
 
@@ -47,20 +56,16 @@ SEXP cpp_set_abs(SEXP x){
   cpp_check_numeric(x);
   SEXP out = Rf_protect(check_transform_altrep(x));
   R_xlen_t n = Rf_xlength(out);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   switch (TYPEOF(out)){
   case INTSXP: {
     int *p_out = INTEGER(out);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = p_out[i] == NA_INTEGER ? p_out[i] : std::abs(p_out[i]);
-      }
+      CHEAPR_MATH_INT_LOOP(std::abs);
     } else {
       OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = p_out[i] == NA_INTEGER ? p_out[i] : std::abs(p_out[i]);
-      }
+      CHEAPR_MATH_INT_LOOP(std::abs);
     }
     break;
   }
@@ -68,15 +73,11 @@ SEXP cpp_set_abs(SEXP x){
     double *p_out = REAL(out);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = p_out[i] != p_out[i] ? p_out[i] : std::fabs(p_out[i]);
-      }
+      CHEAPR_MATH_INT_LOOP(std::fabs);
     }
     else {
       OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = p_out[i] != p_out[i] ? p_out[i] : std::fabs(p_out[i]);
-      }
+      CHEAPR_MATH_INT_LOOP(std::fabs);
     }
     break;
   }
@@ -90,19 +91,15 @@ SEXP cpp_set_floor(SEXP x){
   cpp_check_numeric(x);
   SEXP out = Rf_protect(check_transform_altrep(x));
   R_xlen_t n = Rf_xlength(out);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   if (Rf_isReal(out)){
     double *p_out = REAL(out);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? std::floor(p_out[i]) : p_out[i];
-      }
+      CHEAPR_MATH_REAL_LOOP(std::floor);
     } else {
       OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? std::floor(p_out[i]) : p_out[i];
-      }
+      CHEAPR_MATH_REAL_LOOP(std::floor);
     }
   }
   Rf_unprotect(1);
@@ -114,19 +111,15 @@ SEXP cpp_set_ceiling(SEXP x){
   cpp_check_numeric(x);
   SEXP out = Rf_protect(check_transform_altrep(x));
   R_xlen_t n = Rf_xlength(x);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   if (Rf_isReal(out)){
     double *p_out = REAL(out);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? std::ceil(p_out[i]) : p_out[i];
-      }
+      CHEAPR_MATH_REAL_LOOP(std::ceil);
     } else {
       OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? std::ceil(p_out[i]) : p_out[i];
-      }
+      CHEAPR_MATH_REAL_LOOP(std::ceil);
     }
   }
   Rf_unprotect(1);
@@ -138,19 +131,15 @@ SEXP cpp_set_trunc(SEXP x){
   cpp_check_numeric(x);
   SEXP out = Rf_protect(check_transform_altrep(x));
   R_xlen_t n = Rf_xlength(out);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   if (Rf_isReal(out)){
     double *p_out = REAL(out);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? std::trunc(p_out[i]) : p_out[i];
-      }
+      CHEAPR_MATH_REAL_LOOP(std::trunc);
     } else {
       OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? std::trunc(p_out[i]) : p_out[i];
-      }
+      CHEAPR_MATH_REAL_LOOP(std::trunc);
     }
   }
   Rf_unprotect(1);
@@ -162,7 +151,7 @@ SEXP cpp_set_change_sign(SEXP x){
   cpp_check_numeric(x);
   SEXP out = Rf_protect(check_transform_altrep(x));
   R_xlen_t n = Rf_xlength(out);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   switch (TYPEOF(out)){
   case INTSXP: {
     int *p_out = INTEGER(out);
@@ -204,7 +193,7 @@ SEXP cpp_set_change_sign(SEXP x){
 SEXP cpp_set_exp(SEXP x){
   cpp_check_numeric(x);
   R_xlen_t n = Rf_xlength(x);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   SEXP out;
   if (!Rf_isReal(x)){
     copy_warning();
@@ -215,14 +204,10 @@ SEXP cpp_set_exp(SEXP x){
   double *p_out = REAL(out);
   if (n_cores > 1){
     OMP_PARALLEL_FOR_SIMD
-    for (R_xlen_t i = 0; i < n; ++i) {
-      p_out[i] = (p_out[i] == p_out[i]) ? std::exp(p_out[i]) : p_out[i];
-    }
+    CHEAPR_MATH_REAL_LOOP(std::exp);
   } else {
     OMP_FOR_SIMD
-    for (R_xlen_t i = 0; i < n; ++i) {
-      p_out[i] = (p_out[i] == p_out[i]) ? std::exp(p_out[i]) : p_out[i];
-    }
+    CHEAPR_MATH_REAL_LOOP(std::exp);
   }
   Rf_unprotect(1);
   return out;
@@ -232,7 +217,7 @@ SEXP cpp_set_exp(SEXP x){
 SEXP cpp_set_sqrt(SEXP x){
   cpp_check_numeric(x);
   R_xlen_t n = Rf_xlength(x);
-  int n_cores = n >= 100000 ? num_cores() : 1;
+  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   SEXP out;
   if (!Rf_isReal(x)){
     copy_warning();
@@ -240,17 +225,13 @@ SEXP cpp_set_sqrt(SEXP x){
   } else {
     out = Rf_protect(check_transform_altrep(x));
   }
-  double *p_x = REAL(out);
+  double *p_out = REAL(out);
   if (n_cores > 1){
     OMP_PARALLEL_FOR_SIMD
-    for (R_xlen_t i = 0; i < n; ++i) {
-      p_x[i] = (p_x[i] == p_x[i]) ? std::sqrt(p_x[i]) : p_x[i];
-    }
+    CHEAPR_MATH_REAL_LOOP(std::sqrt);
   } else {
     OMP_FOR_SIMD
-    for (R_xlen_t i = 0; i < n; ++i) {
-      p_x[i] = (p_x[i] == p_x[i]) ? std::sqrt(p_x[i]) : p_x[i];
-    }
+    CHEAPR_MATH_REAL_LOOP(std::sqrt);
   }
   Rf_unprotect(1);
   return out;
@@ -260,15 +241,23 @@ SEXP cpp_set_sqrt(SEXP x){
 SEXP cpp_set_add(SEXP x, SEXP y){
   cpp_check_numeric(x);
   cpp_check_numeric(y);
-  int n_protections = 0;
-  SEXP out = Rf_protect(check_transform_altrep(x));
-  ++n_protections;
+  int NP = 0;
+  SEXP out = Rf_protect(check_transform_altrep(x)); ++NP;
   R_xlen_t xn = Rf_xlength(out);
   R_xlen_t yn = Rf_xlength(y);
-  int n_cores = xn >= 100000 ? num_cores() : 1;
-  if (yn > xn){
-    Rf_error("length(y) must be <= length(x)");
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
+
+  if (xn > 0){
+    if (yn > xn){
+      Rf_unprotect(NP);
+      Rf_error("length(y) must be <= length(x)");
+    }
+    if (yn == 0){
+      Rf_unprotect(NP);
+      Rf_error("length(y) must be be non-zero");
+    }
   }
+
   switch (TYPEOF(out)){
   case LGLSXP:
   case INTSXP: {
@@ -288,7 +277,7 @@ SEXP cpp_set_add(SEXP x, SEXP y){
   case REALSXP: {
     copy_warning();
     Rf_protect(out = Rf_coerceVector(out, REALSXP));
-    ++n_protections;
+    ++NP;
     double *p_x = REAL(out);
     double *p_y = REAL(y);
 #pragma omp parallel for simd num_threads(n_cores) if (n_cores > 1)
@@ -330,7 +319,7 @@ SEXP cpp_set_add(SEXP x, SEXP y){
   }
   }
   }
-  Rf_unprotect(n_protections);
+  Rf_unprotect(NP);
   return out;
 }
 
@@ -338,14 +327,21 @@ SEXP cpp_set_add(SEXP x, SEXP y){
 SEXP cpp_set_subtract(SEXP x, SEXP y){
   cpp_check_numeric(x);
   cpp_check_numeric(y);
-  int n_protections = 0;
+  int NP = 0;
   SEXP out = Rf_protect(check_transform_altrep(x));
-  ++n_protections;
+  ++NP;
   R_xlen_t xn = Rf_xlength(out);
   R_xlen_t yn = Rf_xlength(y);
-  int n_cores = xn >= 100000 ? num_cores() : 1;
-  if (yn > xn){
-    Rf_error("length(y) must be <= length(x)");
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
+  if (xn > 0){
+    if (yn > xn){
+      Rf_unprotect(NP);
+      Rf_error("length(y) must be <= length(x)");
+    }
+    if (yn == 0){
+      Rf_unprotect(NP);
+      Rf_error("length(y) must be be non-zero");
+    }
   }
   switch (TYPEOF(out)){
   case LGLSXP:
@@ -366,7 +362,7 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
   case REALSXP: {
     copy_warning();
     Rf_protect(out = Rf_coerceVector(out, REALSXP));
-    ++n_protections;
+    ++NP;
     double *p_x = REAL(out);
     double *p_y = REAL(y);
 #pragma omp parallel for simd num_threads(n_cores) if (n_cores > 1)
@@ -408,7 +404,7 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
   }
   }
   }
-  Rf_unprotect(n_protections);
+  Rf_unprotect(NP);
   return out;
 }
 
@@ -416,14 +412,21 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
 SEXP cpp_set_multiply(SEXP x, SEXP y){
   cpp_check_numeric(x);
   cpp_check_numeric(y);
-  int n_protections = 0;
+  int NP = 0;
   SEXP out = Rf_protect(check_transform_altrep(x));
-  ++n_protections;
+  ++NP;
   R_xlen_t xn = Rf_xlength(out);
   R_xlen_t yn = Rf_xlength(y);
-  int n_cores = xn >= 100000 ? num_cores() : 1;
-  if (yn > xn){
-    Rf_error("length(y) must be <= length(x)");
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
+  if (xn > 0){
+    if (yn > xn){
+      Rf_unprotect(NP);
+      Rf_error("length(y) must be <= length(x)");
+    }
+    if (yn == 0){
+      Rf_unprotect(NP);
+      Rf_error("length(y) must be be non-zero");
+    }
   }
   switch (TYPEOF(out)){
   case LGLSXP:
@@ -444,7 +447,7 @@ SEXP cpp_set_multiply(SEXP x, SEXP y){
   case REALSXP: {
     copy_warning();
     Rf_protect(out = Rf_coerceVector(out, REALSXP));
-    ++n_protections;
+    ++NP;
     double *p_x = REAL(out);
     double *p_y = REAL(y);
 #pragma omp parallel for simd num_threads(n_cores) if (n_cores > 1)
@@ -463,7 +466,7 @@ SEXP cpp_set_multiply(SEXP x, SEXP y){
   case LGLSXP:
   case INTSXP: {
     // Rf_protect(y = Rf_coerceVector(y, REALSXP));
-    // ++n_protections;
+    // ++NP;
     double *p_x = REAL(out);
     int *p_y = INTEGER(y);
 #pragma omp parallel for simd num_threads(n_cores) if (n_cores > 1)
@@ -488,7 +491,7 @@ SEXP cpp_set_multiply(SEXP x, SEXP y){
   }
   }
   }
-  Rf_unprotect(n_protections);
+  Rf_unprotect(NP);
   return out;
 }
 
@@ -498,9 +501,14 @@ SEXP cpp_set_divide(SEXP x, SEXP y){
   cpp_check_numeric(y);
   R_xlen_t xn = Rf_xlength(x);
   R_xlen_t yn = Rf_xlength(y);
-  int n_cores = xn >= 100000 ? num_cores() : 1;
-  if (yn > xn){
-    Rf_error("length(y) must be <= length(x)");
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
+  if (xn > 0){
+    if (yn > xn){
+      Rf_error("length(y) must be <= length(x)");
+    }
+    if (yn == 0){
+      Rf_error("length(y) must be be non-zero");
+    }
   }
   SEXP out;
   if (!Rf_isReal(x)){
@@ -544,9 +552,14 @@ SEXP cpp_set_pow(SEXP x, SEXP y){
   cpp_check_numeric(y);
   R_xlen_t xn = Rf_xlength(x);
   R_xlen_t yn = Rf_xlength(y);
-  int n_cores = xn >= 100000 ? num_cores() : 1;
-  if (yn > xn){
-    Rf_error("length(y) must be <= length(x)");
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
+  if (xn > 0){
+    if (yn > xn){
+      Rf_error("length(y) must be <= length(x)");
+    }
+    if (yn == 0){
+      Rf_error("length(y) must be be non-zero");
+    }
   }
   SEXP out;
   if (!Rf_isReal(x)){
@@ -597,10 +610,15 @@ SEXP cpp_set_log(SEXP x, SEXP base){
   cpp_check_numeric(base);
   R_xlen_t xn = Rf_xlength(x);
   R_xlen_t basen = Rf_xlength(base);
-  if (basen > xn){
-    Rf_error("length(y) must be <= length(x)");
+  if (xn > 0){
+    if (basen > xn){
+      Rf_error("length(base) must be <= length(x)");
+    }
+    if (basen == 0){
+      Rf_error("length(base) must be be non-zero");
+    }
   }
-  int n_cores = xn >= 100000 ? num_cores() : 1;
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   SEXP out;
   if (!Rf_isReal(x)){
     copy_warning();
@@ -636,10 +654,15 @@ SEXP cpp_set_round(SEXP x, SEXP digits){
   SEXP out = Rf_protect(check_transform_altrep(x));
   R_xlen_t xn = Rf_xlength(out);
   R_xlen_t digitsn = Rf_xlength(digits);
-  if (digitsn > xn){
-    Rf_error("length(y) must be <= length(x)");
+  if (xn > 0){
+    if (digitsn > xn){
+      Rf_error("length(digits) must be <= length(x)");
+    }
+    if (digitsn == 0){
+      Rf_error("length(digits) must be be non-zero");
+    }
   }
-  int n_cores = xn >= 100000 ? num_cores() : 1;
+  int n_cores = xn >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   // We don't need to round integers.
   if (Rf_isReal(out)){
     switch (TYPEOF(digits)){

@@ -2,7 +2,7 @@ test_that("factors", {
   expect_identical(factor_(NULL), factor())
 
   x <- rnorm(10)
-  y <- fill_with_na(x, 5)
+  y <- na_insert(x, 5)
   expect_identical(factor(x), factor_(x))
   expect_identical(factor(y), factor_(y))
   expect_identical(
@@ -35,11 +35,11 @@ test_that("factors", {
   # Used and unused levels
   fct <- factor_(airquality$Ozone, levels = c(NA, 10:100), na_exclude = FALSE)
   expect_identical(
-    used_levels(fct),
+    levels_used(fct),
     intersect(levels(fct), airquality$Ozone)
   )
   expect_identical(
-    unused_levels(fct),
+    levels_unused(fct),
     setdiff(levels(fct), airquality$Ozone)
   )
   expect_identical(

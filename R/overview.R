@@ -42,45 +42,59 @@ overview <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
 #' @rdname overview
 #' @export
 overview.default <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  overview(list_as_df(list(x = x)), hist = hist, digits = digits)
+  overview(new_df(x = x), hist = hist, digits = digits)
 }
 #' @rdname overview
 #' @export
 overview.logical <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  overview(list_as_df(list(x = as.logical(x))), hist = hist, digits = digits)
+  overview(new_df(x = as.logical(x)), hist = hist, digits = digits)
 }
 #' @rdname overview
 #' @export
-overview.numeric <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  out <- overview(list_as_df(list(x = as.numeric(x))), hist = hist, digits = digits)
+overview.integer <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
+  out <- overview(new_df(x = as.integer(x)), hist = hist, digits = digits)
   out$cols <- NA_integer_
   out
 }
 #' @rdname overview
 #' @export
+overview.numeric <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
+  out <- overview(new_df(x = as.numeric(x)), hist = hist, digits = digits)
+  out$cols <- NA_integer_
+  out
+}
+#' @rdname overview
+#' @export
+overview.integer64 <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
+  out <- overview(cpp_int64_to_numeric(x), hist = hist, digits = digits)
+  out$numeric$class <- class(x)[1]
+  out
+}
+#' @rdname overview
+#' @export
 overview.character <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  out <- overview(list_as_df(list(x = as.character(x))), hist = hist, digits = digits)
+  out <- overview(new_df(x = as.character(x)), hist = hist, digits = digits)
   out$cols <- NA_integer_
   out
 }
 #' @rdname overview
 #' @export
 overview.factor <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  out <- overview(list_as_df(list(x = as.factor(x))), hist = hist, digits = digits)
+  out <- overview(new_df(x = as.factor(x)), hist = hist, digits = digits)
   out$cols <- NA_integer_
   out
 }
 #' @rdname overview
 #' @export
 overview.Date <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  out <- overview(list_as_df(list(x = as.Date(x))), hist = hist, digits = digits)
+  out <- overview(new_df(x = as.Date(x)), hist = hist, digits = digits)
   out$cols <- NA_integer_
   out
 }
 #' @rdname overview
 #' @export
 overview.POSIXt <- function(x, hist = FALSE, digits = getOption("cheapr.digits", 2)){
-  out <- overview(list_as_df(list(x = as.POSIXct(x))), hist = hist, digits = digits)
+  out <- overview(new_df(x = as.POSIXct(x)), hist = hist, digits = digits)
   out$cols <- NA_integer_
   out
 }
@@ -115,7 +129,10 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
   }
   lgl_vars <- data_nms[vapply(skim_df, is.logical, FALSE)]
   num_vars <- data_nms[vapply(skim_df, function(x) inherits(x,
-                                                            c("integer", "numeric")), FALSE)]
+                                                            c("integer", "numeric", "integer64")), FALSE)]
+  ### SUBSET OF NUM_VARS
+  int64_vars <- data_nms[vapply(skim_df, function(x) inherits(x, "integer64"), FALSE)]
+
   date_vars <- data_nms[vapply(skim_df, function(x) inherits(x, "Date"), FALSE)]
   datetime_vars <- data_nms[vapply(skim_df, function(x) inherits(x, "POSIXt"),  FALSE)]
   ts_vars <- data_nms[vapply(skim_df, function(x) inherits(x, c("ts", "zoo")),  FALSE)]
@@ -135,7 +152,7 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
                                        n_false = NA_integer_[value_size]))
   lgl_out <- df_add_cols(lgl_out, list(p_true = NA_real_[value_size]))
   if (N > 0L && length(which_lgl) > 0) {
-    lgl_out$n_missing <- pluck_row(summarise_all(lgl_data, num_na), 1)
+    lgl_out$n_missing <- pluck_row(summarise_all(lgl_data, na_count), 1)
     lgl_out$p_complete <- pluck_row(summarise_all(lgl_data, prop_complete), 1)
     lgl_out$n_true <- pluck_row(summarise_all(lgl_data, function(x) sum(x, na.rm = TRUE)), 1)
     lgl_out$n_false <- N - lgl_out[["n_missing"]] - lgl_out[["n_true"]]
@@ -158,8 +175,12 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
   if (hist){
     num_out$hist <- NA_character_[value_size]
   }
+
+  ## Coerce int64 to double
+  num_data <- transform_all(num_data, cpp_int64_to_numeric, int64_vars)
+
   if (N > 0L && length(which_num) > 0) {
-    num_out$n_missing <- pluck_row(summarise_all(num_data, num_na), 1)
+    num_out$n_missing <- pluck_row(summarise_all(num_data, na_count), 1)
     num_out$p_complete <- pluck_row(summarise_all(num_data, prop_complete), 1)
     num_out$n_unique <- pluck_row(summarise_all(num_data, n_unique), 1)
     num_out$n_unique <- num_out$n_unique - (num_out$n_missing > 0L)
@@ -176,7 +197,7 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
     ), 1)
     num_out$p100 <- pluck_row(summarise_all(num_data, collapse::fmax), 1)
     num_out$iqr <- num_out$p75 - num_out$p25
-    num_out$sd <- pluck_row(summarise_all(num_data, collapse::fsd), 1)
+    num_out$sd <- pluck_row(summarise_all(num_data, cheapr_sd), 1)
     if (hist){
       num_out$hist <- pluck_row(summarise_all(
         num_data, inline_hist
@@ -196,7 +217,7 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
   date_out <- df_add_cols(date_out, list(min = .Date(NA_real_[value_size]),
                                          max = .Date(NA_real_[value_size])))
   if (N > 0L && length(which_date) > 0) {
-    date_out$n_missing <- pluck_row(summarise_all(date_data, num_na), 1)
+    date_out$n_missing <- pluck_row(summarise_all(date_data, na_count), 1)
     date_out$p_complete <- pluck_row(summarise_all(date_data, prop_complete), 1)
     date_out$n_unique <- pluck_row(summarise_all(date_data, n_unique), 1)
     date_out$n_unique <- date_out$n_unique - (date_out$n_missing > 0L)
@@ -221,7 +242,7 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
   datetime_out <- df_add_cols(datetime_out, list(min = .POSIXct(NA_real_[value_size]),
                                                  max = .POSIXct(NA_real_[value_size])))
   if (N > 0L && length(which_datetime) > 0) {
-    datetime_out$n_missing <- pluck_row(summarise_all(datetime_data, num_na), 1)
+    datetime_out$n_missing <- pluck_row(summarise_all(datetime_data, na_count), 1)
     datetime_out$p_complete <- pluck_row(summarise_all(datetime_data, prop_complete), 1)
     datetime_out$n_unique <- pluck_row(summarise_all(datetime_data, n_unique), 1)
     datetime_out$n_unique <- datetime_out$n_unique - (datetime_out$n_missing > 0L)
@@ -266,7 +287,7 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
   cat_out <- df_add_cols(cat_out, list(min = NA_character_[value_size],
                                        max = NA_character_[value_size]))
   if (N > 0L && length(which_cat) > 0) {
-    cat_out$n_missing <- pluck_row(summarise_all(cat_data, num_na), 1)
+    cat_out$n_missing <- pluck_row(summarise_all(cat_data, na_count), 1)
     cat_out$p_complete <- pluck_row(summarise_all(cat_data, prop_complete), 1)
     cat_out$n_unique <- pluck_row(summarise_all(cat_data, n_unique), 1)
     cat_out$n_unique <- cat_out$n_unique - (cat_out$n_missing > 0L)
@@ -292,7 +313,7 @@ overview.data.frame <- function(x, hist = FALSE, digits = getOption("cheapr.digi
   other_out <- df_add_cols(other_out, list(n_unique = NA_integer_[value_size]))
   if (N > 0L && length(which_other) > 0) {
     other_out$n_missing <- pluck_row(summarise_all(
-      other_data, function(x) num_na(x, recursive = FALSE)
+      other_data, function(x) na_count(x, recursive = FALSE)
       ), 1)
     other_out$p_complete <- pluck_row(summarise_all(
       other_data, function(x) prop_complete(x, recursive = FALSE)
@@ -407,13 +428,13 @@ prop_missing <- function(x, recursive = TRUE){
   } else {
     N <- cpp_vec_length(x)
   }
-  num_na(x, recursive = recursive) / N
+  na_count(x, recursive = recursive) / N
 }
 prop_complete <- function(x, recursive = TRUE){
   1 - prop_missing(x, recursive = recursive)
 }
-transform_all <- function(data, .fn){
-  for (col in names(data)){
+transform_all <- function(data, .fn, .cols = names(data)){
+  for (col in .cols){
     data[[col]] <- .fn(data[[col]])
   }
   data

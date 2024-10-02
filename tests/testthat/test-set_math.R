@@ -4,22 +4,22 @@ test_that("math operations", {
   # The first 2 will not trigger multi-threaded calculations
   make_test_data1 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(rnorm(10^3), 50),
+    assign("x", na_insert(rnorm(10^3), 50),
            envir = parent.frame())
   }
   make_test_data2 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(sample.int(100, 10^3, TRUE), 50),
+    assign("x", na_insert(sample.int(100, 10^3, TRUE), 50),
            envir = parent.frame())
   }
   make_test_data3 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(rnorm(10^5), 10^3),
+    assign("x", na_insert(rnorm(10^5), 10^3),
            envir = parent.frame())
   }
   make_test_data4 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(sample.int(100, 10^5, TRUE), 10^3),
+    assign("x", na_insert(sample.int(100, 10^5, TRUE), 10^3),
            envir = parent.frame())
   }
 
@@ -135,7 +135,7 @@ test_that("more math operations", {
   # The first 2 will not trigger multi-threaded calculations
   make_test_data1 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(rnorm(10^3), 50),
+    assign("x", na_insert(rnorm(10^3), 50),
            envir = parent.frame())
     assign("y", c(0L, NA_integer_, 3:10), envir = parent.frame())
     assign("z", sample(c(Inf, -Inf, NA_real_, sequence_(100 - 3, 0, 0.1))),
@@ -143,7 +143,7 @@ test_that("more math operations", {
   }
   make_test_data2 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(sample.int(100, 10^3, TRUE), 50),
+    assign("x", na_insert(sample.int(100, 10^3, TRUE), 50),
            envir = parent.frame())
     assign("y", c(0L, NA_integer_, 3:10), envir = parent.frame())
     assign("z", sample(c(Inf, -Inf, NA_real_, sequence_(100 - 3, 0, 0.1))),
@@ -151,7 +151,7 @@ test_that("more math operations", {
   }
   make_test_data3 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(rnorm(10^5), 10^3),
+    assign("x", na_insert(rnorm(10^5), 10^3),
            envir = parent.frame())
     assign("y", c(0L, NA_integer_, 3:10), envir = parent.frame())
     assign("z", sample(c(Inf, -Inf, NA_real_, sequence_(1000 - 3, 0, 0.1))),
@@ -159,7 +159,7 @@ test_that("more math operations", {
   }
   make_test_data4 <- function(){
     set.seed(3742)
-    assign("x", fill_with_na(sample.int(100, 10^5, TRUE), 10^3),
+    assign("x", na_insert(sample.int(100, 10^5, TRUE), 10^3),
            envir = parent.frame())
     assign("y", c(0L, NA_integer_, 3:10), envir = parent.frame())
     assign("z", sample(c(Inf, -Inf, NA_real_, sequence_(1000 - 3, 0, 0.1))),
@@ -361,4 +361,44 @@ test_that("more math operations", {
     suppressWarnings(set_log(r_copy(x), y))
   )
   options(cheapr.cores = 1)
+})
+
+test_that("zero-length vectors", {
+  x <- 1
+  y <- numeric()
+
+  expect_error(set_add(x, y))
+  expect_error(set_subtract(x, y))
+  expect_error(set_divide(x, y))
+  expect_error(set_multiply(x, y))
+  expect_error(set_log(x, y))
+  expect_error(set_pow(x, y))
+  expect_error(set_round(x, y))
+
+  expect_identical(set_add(y, x), numeric())
+  expect_identical(set_subtract(y, x), numeric())
+  expect_identical(set_divide(y, x), numeric())
+  expect_identical(set_multiply(y, x), numeric())
+  expect_identical(set_log(y, x), numeric())
+  expect_identical(set_pow(y, x), numeric())
+  expect_identical(set_round(y, x), numeric())
+
+  x <- 1L
+  y <- integer()
+
+  expect_error(set_add(x, y))
+  expect_error(set_subtract(x, y))
+  expect_error(set_divide(x, y))
+  expect_error(set_multiply(x, y))
+  expect_error(set_log(x, y))
+  expect_error(set_pow(x, y))
+  expect_error(set_round(x, y))
+
+  expect_identical(set_add(y, x), integer())
+  expect_identical(set_subtract(y, x), integer())
+  expect_identical(set_divide(as.double(y), x), numeric())
+  expect_identical(set_multiply(y, x), integer())
+  expect_identical(set_log(as.double(y), x), numeric())
+  expect_identical(set_pow(as.double(y), x), numeric())
+  expect_identical(set_round(y, x), integer())
 })
