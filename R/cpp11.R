@@ -24,10 +24,6 @@ cpp_set_add_attributes <- function(x, attributes, add) {
   .Call(`_cheapr_cpp_set_add_attributes`, x, attributes, add)
 }
 
-cpp_character_compare <- function(x, y, op) {
-  .Call(`_cheapr_cpp_character_compare`, x, y, op)
-}
-
 cpp_gcd2 <- function(x, y, tol, na_rm) {
   .Call(`_cheapr_cpp_gcd2`, x, y, tol, na_rm)
 }
@@ -262,6 +258,10 @@ var_sum_squared_diff <- function(x, mu) {
 
 cpp_bin <- function(x, breaks, codes, right, include_lowest, include_oob) {
   .Call(`_cheapr_cpp_bin`, x, breaks, codes, right, include_lowest, include_oob)
+}
+
+cpp_rev <- function(x, set) {
+  .Call(`_cheapr_cpp_rev`, x, set)
 }
 
 cpp_which_ <- function(x, invert) {

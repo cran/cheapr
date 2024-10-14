@@ -13,6 +13,8 @@
 \alias{val_insert}
 \alias{na_insert}
 \alias{vector_length}
+\alias{cheapr_var}
+\alias{cheapr_rev}
 \title{Extra utilities}
 \usage{
 setdiff_(x, y, dups = TRUE)
@@ -47,6 +49,10 @@ val_insert(x, value, n = NULL, prop = NULL)
 na_insert(x, n = NULL, prop = NULL)
 
 vector_length(x)
+
+cheapr_var(x, na.rm = TRUE)
+
+cheapr_rev(x)
 }
 \arguments{
 \item{x}{A vector or data frame.}
@@ -86,6 +92,9 @@ randomly into your vector.}
 
 \item{prop}{Proportion of scalar values (or \code{NA}) values to insert
 randomly into your vector.}
+
+\item{na.rm}{Should \code{NA} values be ignored in \code{cheapr_var()} Default is
+\code{TRUE}.}
 }
 \value{
 \verb{enframe()_} converts a vector to a data frame. \cr
@@ -106,15 +115,10 @@ Useful for replacing lots of data with a single value. \cr
 Useful for generating missing data. \cr
 \code{vector_length} behaves mostly like \code{NROW()} except
 for matrices in which it matches \code{length()}.
+\code{cheapr_var} returns the variance of a numeric vector.
+No coercion happens for integer vectors and so is very cheap. \cr
+\code{cheapr_rev} is a much cheaper version of \code{rev()}.
 }
 \description{
 Extra utilities
-}
-\details{
-\code{intersect_()} and \code{setdiff_()} are faster and more efficient
-alternatives to \code{intersect()} and \code{setdiff()} respectively. \cr
-\code{enframe_()} and \code{deframe_()} are faster alternatives to
-\code{tibble::enframe()} and \code{tibble::deframe()} respectively. \cr
-\code{cut_numeric()} is a faster and more efficient alternative to
-\code{cut.default()}.
 }

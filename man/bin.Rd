@@ -26,7 +26,8 @@ Default is \code{TRUE}. If \code{FALSE} they are left-open (and right-closed).}
 \item{include_oob}{Should out-of-bounds interval be included?
 Default is \code{FALSE}. This is the equivalent of adding \code{Inf} as
 the last value of the breaks, or \code{-Inf} as the
-first value of the breaks if \code{left_closed = FALSE}.}
+first value of the breaks if \code{left_closed = FALSE}. When \code{TRUE},
+this essentially becomes \code{findInterval()}.}
 
 \item{codes}{Should an integer vector indicating which bin the values
 fall into be returned? Default is \code{TRUE}. If \code{FALSE} the
@@ -42,4 +43,7 @@ When \code{x} is an integer vector, \code{bin()} is cheaper than \code{.bincode(
 no coercion to a double vector occurs. This alternative also has more
 arguments that allow you to return the start values of the binned vector,
 as well as including out-of-bounds intervals.
+}
+\seealso{
+\link{get_breaks} \link{as_discrete}
 }

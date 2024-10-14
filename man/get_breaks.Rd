@@ -6,18 +6,18 @@
 \alias{get_breaks.integer64}
 \title{Pretty break-points for continuous (numeric) data}
 \usage{
-get_breaks(x, n = 7, ...)
+get_breaks(x, n = 10, ...)
 
 \method{get_breaks}{numeric}(
   x,
-  n = 7,
+  n = 10,
   pretty = TRUE,
   expand_min = FALSE,
   expand_max = FALSE,
   ...
 )
 
-\method{get_breaks}{integer64}(x, n = 7, ...)
+\method{get_breaks}{integer64}(x, n = 10, ...)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -26,13 +26,17 @@ get_breaks(x, n = 7, ...)
 
 \item{...}{Extra arguments passed onto methods.}
 
-\item{pretty}{Should pretty break-points be prioritised? Default is \code{TRUE}.}
+\item{pretty}{Should pretty break-points be prioritised? Default is \code{TRUE}.
+If \code{FALSE} bin-widths will be calculated as \code{diff(range(x)) / n}.}
 
 \item{expand_min}{Should smallest break be extended beyond the
-minimum of the data? Default is \code{FALSE}.}
+minimum of the data? Default is \code{FALSE}.
+If \code{TRUE} then \code{min(get_breaks(x))} is ensured to be less than \code{min(x)}.}
 
 \item{expand_max}{Should largest break be extended beyond the maximum
-of the data? Default is \code{FALSE}.}
+of the data? Default is \code{FALSE}.
+If \code{TRUE} then \code{max(get_breaks(x))} is ensured
+to be greater than \code{max(x)}.}
 }
 \value{
 A numeric vector of break-points.
@@ -46,14 +50,29 @@ library(cheapr)
 set.seed(123)
 ages <- sample(0:80, 100, TRUE)
 
+# Pretty
 get_breaks(ages, n = 10)
+# Not-pretty
+# bin-width is diff(range(ages)) / n_breaks
+get_breaks(ages, n = 10, pretty = FALSE)
 
-## To get the same break-points that `cut()` produces, we can do this..
+# `get_breaks()` is left-biased in a sense, meaning that
+# the first break is always <= `min(x)` but the last break
+# may be < `max(x)`
 
-signif(
-  get_breaks(ages, n = 5, pretty = FALSE,
-             expand_min = TRUE, expand_max = TRUE), 3
-)
-levels(cut(ages, 5))
+# To get right-biased breaks we can use a helper like so..
 
+right_breaks <- function(x, ...){
+  -get_breaks(-x, ...)
+}
+
+get_breaks(4:24, 10)
+right_breaks(4:24, 10)
+
+# Use `rev()` to ensure they are in ascending order
+rev(right_breaks(4:24, 10))
+
+}
+\seealso{
+\link{bin} \link{as_discrete}
 }

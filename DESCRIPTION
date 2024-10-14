@@ -1,6 +1,6 @@
 Package: cheapr
 Title: Simple Functions to Save Time and Memory
-Version: 0.9.8
+Version: 0.9.9
 Authors@R: 
     person("Nick", "Christofides", , "nick.christofides.r@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9743-7342"))
@@ -19,7 +19,7 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 RoxygenNote: 7.3.2
 NeedsCompilation: yes
-Packaged: 2024-10-02 10:21:03 UTC; Nmc5
+Packaged: 2024-10-14 08:24:25 UTC; Nmc5
 Author: Nick Christofides [aut, cre] (<https://orcid.org/0000-0002-9743-7342>)
 Repository: CRAN
-Date/Publication: 2024-10-02 10:50:04 UTC
+Date/Publication: 2024-10-14 08:50:07 UTC

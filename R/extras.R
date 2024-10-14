@@ -20,6 +20,8 @@
 #' randomly into your vector.
 #' @param prop Proportion of scalar values (or `NA`) values to insert
 #' randomly into your vector.
+#' @param na.rm Should `NA` values be ignored in `cheapr_var()` Default is
+#' `TRUE`.
 #'
 #' @returns
 #' `enframe()_` converts a vector to a data frame. \cr
@@ -40,14 +42,9 @@
 #' Useful for generating missing data. \cr
 #' `vector_length` behaves mostly like `NROW()` except
 #' for matrices in which it matches `length()`.
-#'
-#' @details
-#' `intersect_()` and `setdiff_()` are faster and more efficient
-#' alternatives to `intersect()` and `setdiff()` respectively. \cr
-#' `enframe_()` and `deframe_()` are faster alternatives to
-#' `tibble::enframe()` and `tibble::deframe()` respectively. \cr
-#' `cut_numeric()` is a faster and more efficient alternative to
-#' `cut.default()`.
+#' `cheapr_var` returns the variance of a numeric vector.
+#' No coercion happens for integer vectors and so is very cheap. \cr
+#' `cheapr_rev` is a much cheaper version of `rev()`.
 #'
 #' @export
 #' @rdname extras
@@ -206,6 +203,46 @@ na_insert <- function(x, n = NULL, prop = NULL){
 #' @export
 #' @rdname extras
 vector_length <- cpp_vec_length
+#' @export
+#' @rdname extras
+cheapr_var <- function(x, na.rm = TRUE){
+  if (is.integer(x)){
+    y <- as.integer(x)
+  } else {
+    y <- as.double(x)
+  }
+  if (na.rm){
+    N <- (length(y) - na_count(y)) - 1
+  } else {
+    N <- length(y) - 1
+  }
+  if (N < 1){
+    return(NA_real_)
+  } else {
+    mu <- collapse::fmean(y, na.rm = na.rm)
+    # mu <- sum(y, na.rm = na.rm) / (N + 1)
+    if (is.na(mu)){
+      NA_real_
+    } else {
+      var_sum_squared_diff(y, as.double(mu)) /  N
+    }
+  }
+}
+#' @export
+#' @rdname extras
+cheapr_rev <- function(x){
+  # If x is a simple vector, use cpp_rev
+  if (!is.object(x) && is.atomic(x)){
+    .Call(`_cheapr_cpp_rev`, x, FALSE)
+  } else {
+    n <- vector_length(x)
+    sset(x, n:min(0L, n))
+  }
+}
+cheapr_sd <- function(x, na.rm = TRUE){
+  sqrt(cheapr_var(x, na.rm = na.rm))
+}
+
 
 # head_ <- function(x, n = 1L){
 #   check_length(n, 1L)

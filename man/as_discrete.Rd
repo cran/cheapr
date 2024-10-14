@@ -20,6 +20,7 @@ as_discrete(x, ...)
   intv_closers = c("[", "]"),
   intv_openers = c("(", ")"),
   intv_sep = ",",
+  inf_label = NULL,
   ...
 )
 
@@ -36,7 +37,15 @@ as_discrete(x, ...)
 
 \item{include_endpoint}{Include endpoint? Default is \code{FALSE}.}
 
-\item{include_oob}{Include out-of-bounds values? Default is \code{FALSE}.}
+\item{include_oob}{Include out-of-bounds values? Default is \code{FALSE}.
+This is equivalent to \code{breaks = c(breaks, Inf)} or
+\code{breaks = c(-Inf, breaks)} when \code{left_closed = FALSE}.
+If \code{include_endpoint = TRUE}, the endpoint interval is prioritised before
+the out-of-bounds interval.
+This behaviour cannot be replicated easily with \code{cut()}.
+For example, these 2 expressions are not equivalent: \cr
+\preformatted{cut(10, c(9, 10, Inf), right = F, include.lowest = T) !=
+as_discrete(10, c(9, 10), include_endpoint = T, include_oob = T)}}
 
 \item{ordered}{Should result be an ordered factor? Default is \code{FALSE}.}
 
@@ -52,12 +61,23 @@ use for opening either left or right closed intervals.}
 
 \item{intv_sep}{A length 1 character vector used to separate the start and
 end points.}
+
+\item{inf_label}{Label to use for intervals that include infinity.
+If left \code{NULL} the Unicode infinity symbol is used.}
 }
 \value{
 A factor of discrete bins (intervals of start/end pairs).
 }
 \description{
-Turn continuous data into discrete bins
+This is a cheapr version of \code{cut.numeric()} which is more efficient and
+prioritises pretty-looking breaks by default through
+the use of \code{get_breaks()}.
+Out-of-bounds values can be included naturally through the
+\code{include_oob} argument. Left-closed (right-open) intervals are
+returned by default in contrast to cut's default right-closed intervals.
+Furthermore there is flexibility in formatting the interval bins,
+allowing the user to specify formatting functions and symbols for
+the interval close and open symbols.
 }
 \examples{
 library(cheapr)
@@ -75,7 +95,7 @@ age_group <- function(x, breaks){
   age_groups <- as_discrete(
     x,
     breaks = breaks,
-    intv_sep = "--",
+    intv_sep = "-",
     intv_end_fun = function(x) x - 1,
     intv_openers = c("", ""),
     intv_closers = c("", ""),
@@ -96,4 +116,29 @@ age_group(ages, seq(0, 80, 20))
 age_group(ages, seq(0, 25, 5))
 age_group(ages, 5)
 
+# To closely replicate `cut()` with `as_discrete()` we can use the following
+
+cheapr_cut <- function(x, breaks, right = TRUE,
+                       include.lowest = FALSE,
+                       ordered.result = FALSE){
+  if (length(breaks) == 1){
+    breaks <- get_breaks(x, breaks, pretty = FALSE)
+    adj <- diff(range(breaks)) * 0.001
+    breaks[1] <- breaks[1] - adj
+    breaks[length(breaks)] <- breaks[length(breaks)] + adj
+  }
+  as_discrete(x, breaks, left_closed = !right,
+              include_endpoint = include.lowest,
+              ordered = ordered.result,
+              intv_start_fun = function(x) formatC(x, digits = 3, width = 1),
+              intv_end_fun = function(x) formatC(x, digits = 3, width = 1))
+}
+
+x <- rnorm(100)
+cheapr_cut(x, 10)
+identical(cut(x, 10), cheapr_cut(x, 10))
+
+}
+\seealso{
+\link{bin} \link{get_breaks}
 }
