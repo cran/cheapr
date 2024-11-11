@@ -1,4 +1,4 @@
-#include "cheapr_cpp.h"
+#include "cheapr.h"
 
 // Adding and removing attributes in-place
 // There is a check to ensure that attributes are copied when they are the same
@@ -49,8 +49,10 @@ SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add) {
       // is.null or empty list?
       (attrs_are_a_list && n == 0)){
     if (add){
+      Rf_unprotect(NP);
       return x;
     } else {
+      Rf_unprotect(NP);
       return cpp_set_rm_attributes(x);
     }
   }

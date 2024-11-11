@@ -1,4 +1,4 @@
-#include "cheapr_cpp.h"
+#include "cheapr.h"
 
 // Subsetting vectors and data frames
 // Includes a unique optimisation on range subsetting
@@ -465,18 +465,18 @@ SEXP cpp_sset_df(SEXP x, SEXP indices){
   long long int llxn = xn;
   int ncols = Rf_length(x);
   int n = Rf_length(indices);
-  int n_protections = 0;
+  int NP = 0;
   int zero_count = 0;
   int pos_count = 0;
   int oob_count = 0;
   int na_count = 0;
   int out_size;
-  bool do_parallel = n >= 10000;
+  bool do_parallel = n >= CHEAPR_OMP_THRESHOLD;
   int n_cores = do_parallel ? num_cores() : 1;
   cpp11::function cheapr_sset = cpp11::package("cheapr")["sset"];
   const SEXP *p_x = VECTOR_PTR_RO(x);
   SEXP out = Rf_protect(Rf_allocVector(VECSXP, ncols));
-  ++n_protections;
+  ++NP;
   // SEXP *p_out = VECTOR_PTR(out);
 
   // If indices is a special type of ALTREP compact int sequence, we can
@@ -487,7 +487,7 @@ SEXP cpp_sset_df(SEXP x, SEXP indices){
     // ALTREP integer sequence method
 
     SEXP seq_data = Rf_protect(compact_seq_data(indices));
-    ++n_protections;
+    ++NP;
     R_xlen_t from = REAL(seq_data)[0];
     R_xlen_t to = REAL(seq_data)[1];
     R_xlen_t by = REAL(seq_data)[2];
@@ -600,7 +600,7 @@ SEXP cpp_sset_df(SEXP x, SEXP indices){
 
     } else if (neg_count > 0){
       SEXP indices2 = Rf_protect(cpp11::package("cheapr")["neg_indices_to_pos"](indices, xn));
-      ++n_protections;
+      ++NP;
       out_size = Rf_length(indices2);
       int *pi2 = INTEGER(indices2);
       for (int j = 0; j < ncols; ++j){
@@ -629,9 +629,9 @@ SEXP cpp_sset_df(SEXP x, SEXP indices){
       // If index vector is clean except for existence of zeroes
     } else if (zero_count > 0 && oob_count == 0 && na_count == 0){
       SEXP r_zero = Rf_protect(Rf_ScalarInteger(0));
-      ++n_protections;
+      ++NP;
       SEXP indices2 = Rf_protect(cpp11::package("cheapr")["val_rm"](indices, r_zero));
-      ++n_protections;
+      ++NP;
       int *pi2 = INTEGER(indices2);
       for (int j = 0; j < ncols; ++j){
         SEXP df_var = Rf_protect(p_x[j]);
@@ -665,123 +665,27 @@ SEXP cpp_sset_df(SEXP x, SEXP indices){
     }
   }
   SEXP names = Rf_protect(Rf_duplicate(Rf_getAttrib(x, R_NamesSymbol)));
-  ++n_protections;
+  ++NP;
   Rf_setAttrib(out, R_NamesSymbol, names);
 
   // list to data frame object
   SEXP df_str = Rf_protect(Rf_ScalarString(Rf_mkChar("data.frame")));
-  ++n_protections;
+  ++NP;
   if (out_size > 0){
     SEXP row_names = Rf_protect(Rf_allocVector(INTSXP, 2));
-    ++n_protections;
+    ++NP;
     INTEGER(row_names)[0] = NA_INTEGER;
     INTEGER(row_names)[1] = -out_size;
     Rf_setAttrib(out, R_RowNamesSymbol, row_names);
   } else {
     SEXP row_names = Rf_protect(Rf_allocVector(INTSXP, 0));
-    ++n_protections;
+    ++NP;
     Rf_setAttrib(out, R_RowNamesSymbol, row_names);
   }
   Rf_classgets(out, df_str);
-  Rf_unprotect(n_protections);
+  Rf_unprotect(NP);
   return out;
 }
-
-// SEXP cpp_sset(SEXP x, SEXP indices){
-//   if (!Rf_isObject(x) && Rf_isNull(Rf_getAttrib(x, R_NamesSymbol)) && is_compact_seq(indices)){
-//     SEXP int_seq_data = Rf_protect(Rf_coerceVector(alt_data1(indices), INTSXP));
-//     int size = INTEGER(int_seq_data)[0];
-//     int from = INTEGER(int_seq_data)[1];
-//     int by = INTEGER(int_seq_data)[2];
-//     int to = from + (std::max(size - 1, 0) * by);
-//     Rf_unprotect(1);
-//     return cpp_sset_range(x, from, to, by);
-//   }
-//   int *pi = INTEGER(indices);
-//   int xn = Rf_length(x);
-//   int n = Rf_length(indices);
-//   int n_protections = 0;
-//   int zero_count = 0;
-//   int pos_count = 0;
-//   int oob_count = 0;
-//   int na_count = 0;
-//   int k = 0;
-//   int out_size;
-//   // bool do_parallel = n >= 10000;
-//   // int n_cores = do_parallel ? num_cores() : 1;
-//
-//   // Counting the number of:
-//   // Zeroes
-//   // Out-of-bounds indices
-//   // Positive indices
-//   // From this we can also work out the number of negatives
-//
-// //   if (do_parallel){
-// // #pragma omp parallel for simd num_threads(n_cores) reduction(+:zero_count,pos_count,oob_count,na_count)
-//   //   for (int j = 0; j < n; ++j){
-//   //     zero_count += (pi[j] == 0);
-//   //     pos_count += (pi[j] > 0);
-//   //     na_count += (pi[j] == NA_INTEGER);
-//   //     oob_count += (std::fabs(pi[j]) > xn);
-//   //   }
-//   // } else {
-// // #pragma omp for simd
-//     for (int j = 0; j < n; ++j){
-//       zero_count += (pi[j] == 0);
-//       pos_count += (pi[j] > 0);
-//       na_count += pi[j] == NA_INTEGER;
-//       oob_count += (std::abs(pi[j]) > xn);
-//     }
-//   // }
-//   int neg_count = n - pos_count - zero_count - na_count;
-//   if ( pos_count > 0 && neg_count > 0){
-//     Rf_error("Cannot mix positive and negative indices");
-//   }
-//   bool simple_sset = zero_count == 0 && oob_count == 0 && na_count == 0 && pos_count == n;
-//
-//   // Convert negative index vector to positive
-//
-//   if (neg_count > 0){
-//     SEXP indices2 = Rf_protect(cpp11::package("cheapr")["neg_indices_to_pos"](indices, xn));
-//     // ++n_protections;
-//     // int *pi2 = INTEGER(indices2);
-//     // pi = pi2;
-//     // out_size = Rf_xlength(indices2);
-//     // n = out_size;
-//     // ++n_protections;
-//     Rf_unprotect(n_protections + 1);
-//     return cpp_sset_unsafe(x, indices2);
-//   } else {
-//     out_size = n - zero_count;
-//   }
-//   if (simple_sset){
-//     Rf_unprotect(n_protections);
-//     return cpp_sset_unsafe(x, indices);
-//   }
-//   switch ( TYPEOF(x) ){
-//   case NILSXP: {
-//     return R_NilValue;
-//   }
-//   case INTSXP: {
-//     int *p_x = INTEGER(x);
-//     SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
-//     ++n_protections;
-//     int *p_out = INTEGER(out);
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       int xi = pi[i];
-//       if (xi != 0){
-//         p_out[k++] = (xi <= xn && xi != NA_INTEGER) ? p_x[xi - 1] : NA_INTEGER;
-//       }
-//     }
-//     Rf_unprotect(n_protections);
-//     return out;
-//   }
-//   default: {
-//     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
-//   }
-//   }
-// }
-
 
 // A subset method using c++ vectors
 

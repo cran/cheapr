@@ -1,3 +1,25 @@
+# cheapr 0.9.91
+
+* New functions `cheapr_if_else`, `case` and `val_match` to make 
+vectorised if-else operations much cheaper.
+
+* New function `with_local_seed` to help run reproducible expressions with a 
+local seed to remove the need for setting a seed globally, especially helpful 
+for small expressions and comparisons without affecting the global RNG state.
+
+* Various internal bug fixes related to the scalar functions.
+
+* Fixed a regression where `NULL` elements were not being correctly dropped
+in `new_df()`.
+
+* New factor functions `levels_rename`, `levels_add`, `levels_rm`, 
+`levels_lump` and `levels_count`.
+
+* `overview` cols are abbreviated to save visual space and histograms are
+printed by default.
+
+* `levels_drop` was not working correctly and has been fixed.
+
 # cheapr 0.9.9
 
 * New functions `cheapr_var` and `cheapr_rev`.

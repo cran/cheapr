@@ -13,10 +13,6 @@
 #' @export
 named_list <- function(..., .keep_null = TRUE){
   dots <- list(...)
-  if (!.keep_null){
-    dots <- cpp_list_rm_null(dots)
-  }
-
   dot_nms <- names(dots)
 
   if (is.null(dot_nms)){
@@ -27,9 +23,12 @@ named_list <- function(..., .keep_null = TRUE){
     dot_nms[empty] <- expr_nms[empty]
     names(dots) <- dot_nms
   }
+  if (!.keep_null){
+    dots <- cpp_list_rm_null(dots)
+  }
   dots
 }
 expr_names <- function(...){
-  as.character(substitute(c(...))[-1L])
-  # vapply(substitute(alist(...))[-1L], deparse2, "", USE.NAMES = FALSE)
+  # as.character(substitute(c(...))[-1L])
+  vapply(substitute(alist(...))[-1L], deparse2, "", USE.NAMES = FALSE)
 }

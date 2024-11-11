@@ -152,6 +152,14 @@ cpp_val_replace <- function(x, value, replace, recursive) {
   .Call(`_cheapr_cpp_val_replace`, x, value, replace, recursive)
 }
 
+cpp_val_set_replace <- function(x, value, replace, recursive) {
+  .Call(`_cheapr_cpp_val_set_replace`, x, value, replace, recursive)
+}
+
+cpp_loc_set_replace <- function(x, where, what) {
+  .Call(`_cheapr_cpp_loc_set_replace`, x, where, what)
+}
+
 cpp_int_sequence <- function(size, from, by) {
   .Call(`_cheapr_cpp_int_sequence`, size, from, by)
 }
@@ -264,6 +272,22 @@ cpp_rev <- function(x, set) {
   .Call(`_cheapr_cpp_rev`, x, set)
 }
 
+cpp_if_else <- function(condition, yes, no, na) {
+  .Call(`_cheapr_cpp_if_else`, condition, yes, no, na)
+}
+
+cpp_lgl_count <- function(x) {
+  .Call(`_cheapr_cpp_lgl_count`, x)
+}
+
+cpp_set_copy_elements <- function(source, target) {
+  invisible(.Call(`_cheapr_cpp_set_copy_elements`, source, target))
+}
+
+cpp_set_or <- function(x, y) {
+  .Call(`_cheapr_cpp_set_or`, x, y)
+}
+
 cpp_which_ <- function(x, invert) {
   .Call(`_cheapr_cpp_which_`, x, invert)
 }
@@ -278,4 +302,8 @@ cpp_which_na <- function(x) {
 
 cpp_which_not_na <- function(x) {
   .Call(`_cheapr_cpp_which_not_na`, x)
+}
+
+cpp_lgl_locs <- function(x, n_true, n_false, include_true, include_false, include_na) {
+  .Call(`_cheapr_cpp_lgl_locs`, x, n_true, n_false, include_true, include_false, include_na)
 }

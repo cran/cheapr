@@ -1,4 +1,4 @@
-#include "cheapr_cpp.h"
+#include "cheapr.h"
 
 // A more memory-efficient which()
 // Author: Nick Christofides
@@ -7,7 +7,7 @@
 
 R_xlen_t count_true(int *px, R_xlen_t n){
   R_xlen_t size = 0;
-  if (n >= 100000){
+  if (n >= CHEAPR_OMP_THRESHOLD){
 #pragma omp parallel for simd num_threads(num_cores()) reduction(+:size)
     for (R_xlen_t j = 0; j < n; ++j) size += (px[j] == TRUE);
     return size;
@@ -82,7 +82,7 @@ SEXP cpp_which_(SEXP x, bool invert){
 
 [[cpp11::register]]
 SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
-  int n_protections = 0;
+  int NP = 0;
   R_xlen_t n = Rf_xlength(x);
   bool is_long = (n > integer_max_);
   if (Rf_length(value) != 1){
@@ -91,27 +91,31 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
   if (Rf_isVectorList(x)){
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
-  SEXP val_is_na = Rf_protect(cpp_is_na(value));
-  ++n_protections;
+  SEXP val_is_na = Rf_protect(cpp_is_na(value)); ++NP;
   if (Rf_asLogical(val_is_na)){
-    Rf_unprotect(n_protections);
+    Rf_unprotect(NP);
     if (invert){
       return cpp_which_not_na(x);
     } else {
       return cpp_which_na(x);
     }
   }
+
+  if (implicit_na_coercion(value, x)){
+    Rf_unprotect(NP);
+    Rf_error("Value has been implicitly converted to NA, please check");
+  }
+
   R_xlen_t n_vals = scalar_count(x, value, false);
   R_xlen_t out_size = invert ? n - n_vals : n_vals;
   R_xlen_t whichi = 0;
   R_xlen_t i = 0;
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case LGLSXP:
   case INTSXP: {
     SEXP out = Rf_protect(Rf_allocVector(is_long ? REALSXP : INTSXP, out_size));
-    ++n_protections;
-    Rf_protect(value = Rf_coerceVector(value, INTSXP));
-    ++n_protections;
+    ++NP;
+    Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
     int val = Rf_asInteger(value);
     int *p_x = INTEGER(x);
     if (is_long){
@@ -129,14 +133,13 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
         CHEAPR_WHICH_VAL(val);
       }
     }
-    Rf_unprotect(n_protections);
+    Rf_unprotect(NP);
     return out;
   }
   case REALSXP: {
     SEXP out = Rf_protect(Rf_allocVector(is_long ? REALSXP : INTSXP, out_size));
-    ++n_protections;
-    Rf_protect(value = Rf_coerceVector(value, REALSXP));
-    ++n_protections;
+    ++NP;
+    Rf_protect(value = coerce_vector(value, REALSXP)); ++NP;
     double val = Rf_asReal(value);
     double *p_x = REAL(x);
     if (is_long){
@@ -154,16 +157,38 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
         CHEAPR_WHICH_VAL(val);
       }
     }
-    Rf_unprotect(n_protections);
+    Rf_unprotect(NP);
+    return out;
+  }
+  case CHEAPR_INT64SXP: {
+    SEXP out = Rf_protect(Rf_allocVector(is_long ? REALSXP : INTSXP, out_size));
+    ++NP;
+    Rf_protect(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
+    long long int val = INTEGER64_PTR(value)[0];
+    long long int *p_x = INTEGER64_PTR(x);
+    if (is_long){
+      double *p_out = REAL(out);
+      if (invert){
+        CHEAPR_WHICH_VAL_INVERTED(val);
+      } else {
+        CHEAPR_WHICH_VAL(val);
+      }
+    } else {
+      int *p_out = INTEGER(out);
+      if (invert){
+        CHEAPR_WHICH_VAL_INVERTED(val);
+      } else {
+        CHEAPR_WHICH_VAL(val);
+      }
+    }
+    Rf_unprotect(NP);
     return out;
   }
   case STRSXP: {
     SEXP out = Rf_protect(Rf_allocVector(is_long ? REALSXP : INTSXP, out_size));
-    ++n_protections;
-    Rf_protect(value = Rf_coerceVector(value, STRSXP));
-    ++n_protections;
-    SEXP val = Rf_protect(Rf_asChar(value));
-    ++n_protections;
+    ++NP;
+    Rf_protect(value = coerce_vector(value, STRSXP)); ++NP;
+    SEXP val = Rf_protect(Rf_asChar(value)); ++NP;
     const SEXP *p_x = STRING_PTR_RO(x);
     if (is_long){
       double *p_out = REAL(out);
@@ -180,11 +205,11 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
         CHEAPR_WHICH_VAL(val);
       }
     }
-    Rf_unprotect(n_protections);
+    Rf_unprotect(NP);
     return out;
   }
   default: {
-    Rf_unprotect(n_protections);
+    Rf_unprotect(NP);
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
@@ -196,7 +221,7 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
 SEXP cpp_which_na(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   bool is_short = (n <= integer_max_);
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
     SEXP out = Rf_protect(Rf_allocVector(INTSXP, 0));
     Rf_unprotect(1);
@@ -226,64 +251,64 @@ SEXP cpp_which_na(SEXP x){
       return out;
     }
   }
+  case CHEAPR_INT64SXP: {
+    R_xlen_t count = na_count(x, true);
+    long long *p_x = INTEGER64_PTR(x);
+    if (is_short){
+      int out_size = count;
+      SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
+      int *p_out = INTEGER(out);
+      int whichi = 0;
+      int i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i++] == NA_INTEGER64);
+      }
+      Rf_unprotect(1);
+      return out;
+    } else {
+      R_xlen_t out_size = count;
+      SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
+      double *p_out = REAL(out);
+      R_xlen_t whichi = 0;
+      R_xlen_t i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i++] == NA_INTEGER64);
+      }
+      Rf_unprotect(1);
+      return out;
+    }
+  }
   case REALSXP: {
     R_xlen_t count = na_count(x, true);
-    if (is_int64(x)){
-      long long *p_x = INTEGER64_PTR(x);
-      if (is_short){
-        int out_size = count;
-        SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
-        int *p_out = INTEGER(out);
-        int whichi = 0;
-        int i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i++] == NA_INTEGER64);
-        }
-        Rf_unprotect(1);
-        return out;
-      } else {
-        R_xlen_t out_size = count;
-        SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
-        double *p_out = REAL(out);
-        R_xlen_t whichi = 0;
-        R_xlen_t i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i++] == NA_INTEGER64);
-        }
-        Rf_unprotect(1);
-        return out;
+    double *p_x = REAL(x);
+    if (is_short){
+      int out_size = count;
+      SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
+      int *p_out = INTEGER(out);
+      int whichi = 0;
+      int i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i] != p_x[i]);
+        ++i;
       }
+      Rf_unprotect(1);
+      return out;
     } else {
-      double *p_x = REAL(x);
-      if (is_short){
-        int out_size = count;
-        SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
-        int *p_out = INTEGER(out);
-        int whichi = 0;
-        int i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i] != p_x[i]);
-          ++i;
-        }
-        Rf_unprotect(1);
-        return out;
-      } else {
-        R_xlen_t out_size = count;
-        SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
-        double *p_out = REAL(out);
-        R_xlen_t whichi = 0;
-        R_xlen_t i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i] != p_x[i]);
-          ++i;
-        }
-        Rf_unprotect(1);
-        return out;
+      R_xlen_t out_size = count;
+      SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
+      double *p_out = REAL(out);
+      R_xlen_t whichi = 0;
+      R_xlen_t i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i] != p_x[i]);
+        ++i;
       }
+      Rf_unprotect(1);
+      return out;
     }
   }
   case STRSXP: {
@@ -358,7 +383,7 @@ SEXP cpp_which_na(SEXP x){
 SEXP cpp_which_not_na(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   bool is_short = (n <= integer_max_);
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
     SEXP out = Rf_protect(Rf_allocVector(INTSXP, 0));
     Rf_unprotect(1);
@@ -388,64 +413,64 @@ SEXP cpp_which_not_na(SEXP x){
       return out;
     }
   }
+  case CHEAPR_INT64SXP: {
+    R_xlen_t count = na_count(x, true);
+    long long *p_x = INTEGER64_PTR(x);
+    if (is_short){
+      int out_size = n - count;
+      SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
+      int *p_out = INTEGER(out);
+      int whichi = 0;
+      int i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i++] != NA_INTEGER64);
+      }
+      Rf_unprotect(1);
+      return out;
+    } else {
+      R_xlen_t out_size = n - count;
+      SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
+      double *p_out = REAL(out);
+      R_xlen_t whichi = 0;
+      R_xlen_t i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i++] != NA_INTEGER64);
+      }
+      Rf_unprotect(1);
+      return out;
+    }
+  }
   case REALSXP: {
     R_xlen_t count = na_count(x, true);
-    if (Rf_inherits(x, "integer64")){
-      long long *p_x = INTEGER64_PTR(x);
-      if (is_short){
-        int out_size = n - count;
-        SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
-        int *p_out = INTEGER(out);
-        int whichi = 0;
-        int i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i++] != NA_INTEGER64);
-        }
-        Rf_unprotect(1);
-        return out;
-      } else {
-        R_xlen_t out_size = n - count;
-        SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
-        double *p_out = REAL(out);
-        R_xlen_t whichi = 0;
-        R_xlen_t i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i++] != NA_INTEGER64);
-        }
-        Rf_unprotect(1);
-        return out;
+    double *p_x = REAL(x);
+    if (is_short){
+      int out_size = n - count;
+      SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
+      int *p_out = INTEGER(out);
+      int whichi = 0;
+      int i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i] == p_x[i]);
+        ++i;
       }
+      Rf_unprotect(1);
+      return out;
     } else {
-      double *p_x = REAL(x);
-      if (is_short){
-        int out_size = n - count;
-        SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
-        int *p_out = INTEGER(out);
-        int whichi = 0;
-        int i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i] == p_x[i]);
-          ++i;
-        }
-        Rf_unprotect(1);
-        return out;
-      } else {
-        R_xlen_t out_size = n - count;
-        SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
-        double *p_out = REAL(out);
-        R_xlen_t whichi = 0;
-        R_xlen_t i = 0;
-        while (whichi < out_size){
-          p_out[whichi] = i + 1;
-          whichi += (p_x[i] == p_x[i]);
-          ++i;
-        }
-        Rf_unprotect(1);
-        return out;
+      R_xlen_t out_size = n - count;
+      SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
+      double *p_out = REAL(out);
+      R_xlen_t whichi = 0;
+      R_xlen_t i = 0;
+      while (whichi < out_size){
+        p_out[whichi] = i + 1;
+        whichi += (p_x[i] == p_x[i]);
+        ++i;
       }
+      Rf_unprotect(1);
+      return out;
     }
   }
   case STRSXP: {
@@ -527,6 +552,88 @@ SEXP cpp_which_not_na(SEXP x){
     Rf_unprotect(2);
     return out;
   }
+  }
+}
+
+// Return the locations of T, F, and NA in one pass
+// Must provide the correct num of T and F as args
+
+[[cpp11::register]]
+SEXP cpp_lgl_locs(SEXP x, R_xlen_t n_true, R_xlen_t n_false,
+                  bool include_true, bool include_false, bool include_na){
+  R_xlen_t n = Rf_xlength(x);
+  int *p_x = LOGICAL(x);
+
+  if (n > integer_max_){
+    SEXP true_locs = Rf_protect(Rf_allocVector(REALSXP, include_true ? n_true : 0));
+    SEXP false_locs = Rf_protect(Rf_allocVector(REALSXP, include_false ? n_false : 0));
+    SEXP na_locs = Rf_protect(Rf_allocVector(REALSXP, include_na ? (n - n_true - n_false) : 0));
+
+    double *p_true = REAL(true_locs);
+    double *p_false = REAL(false_locs);
+    double *p_na = REAL(na_locs);
+
+    R_xlen_t k1 = 0;
+    R_xlen_t k2 = 0;
+    R_xlen_t k3 = 0;
+
+    for (R_xlen_t i = 0; i < n; ++i){
+      if (include_true && p_x[i] == TRUE){
+        p_true[k1++] = i + 1;
+      } else if (include_false && p_x[i] == FALSE){
+        p_false[k2++] = i + 1;
+      } else if (include_na && p_x[i] == NA_LOGICAL){
+        p_na[k3++] = i + 1;
+      }
+    }
+    SEXP out = Rf_protect(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(out, 0, true_locs);
+    SET_VECTOR_ELT(out, 1, false_locs);
+    SET_VECTOR_ELT(out, 2, na_locs);
+
+    SEXP names = Rf_protect(Rf_allocVector(STRSXP, 3));
+    SET_STRING_ELT(names, 0, Rf_mkChar("true"));
+    SET_STRING_ELT(names, 1, Rf_mkChar("false"));
+    SET_STRING_ELT(names, 2, Rf_mkChar("na"));
+    Rf_setAttrib(out, R_NamesSymbol, names);
+
+    Rf_unprotect(5);
+    return out;
+  } else {
+    SEXP true_locs = Rf_protect(Rf_allocVector(INTSXP, include_true ? n_true : 0));
+    SEXP false_locs = Rf_protect(Rf_allocVector(INTSXP, include_false ? n_false : 0));
+    SEXP na_locs = Rf_protect(Rf_allocVector(INTSXP, include_na ? (n - n_true - n_false) : 0));
+
+    int *p_true = INTEGER(true_locs);
+    int *p_false = INTEGER(false_locs);
+    int *p_na = INTEGER(na_locs);
+
+    int k1 = 0;
+    int k2 = 0;
+    int k3 = 0;
+
+    for (int i = 0; i < n; ++i){
+      if (include_true && p_x[i] == TRUE){
+        p_true[k1++] = i + 1;
+      } else if (include_false && p_x[i] == FALSE){
+        p_false[k2++] = i + 1;
+      } else if (include_na && p_x[i] == NA_LOGICAL){
+        p_na[k3++] = i + 1;
+      }
+    }
+    SEXP out = Rf_protect(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(out, 0, true_locs);
+    SET_VECTOR_ELT(out, 1, false_locs);
+    SET_VECTOR_ELT(out, 2, na_locs);
+
+    SEXP names = Rf_protect(Rf_allocVector(STRSXP, 3));
+    SET_STRING_ELT(names, 0, Rf_mkChar("true"));
+    SET_STRING_ELT(names, 1, Rf_mkChar("false"));
+    SET_STRING_ELT(names, 2, Rf_mkChar("na"));
+    Rf_setAttrib(out, R_NamesSymbol, names);
+
+    Rf_unprotect(5);
+    return out;
   }
 }
 

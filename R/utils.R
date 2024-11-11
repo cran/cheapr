@@ -1,7 +1,7 @@
 #' @noRd
 
 # Like deparse1 but has a cutoff in case of massive strings
-deparse2 <- function(expr, collapse = " ", width.cutoff = 500L, nlines = 5L, ...){
+deparse2 <- function(expr, collapse = " ", width.cutoff = 500L, nlines = 10L, ...){
   paste(deparse(expr, width.cutoff, nlines = nlines, ...), collapse = collapse)
 }
 
@@ -34,16 +34,7 @@ check_is_df <- function(x){
     stop(paste(deparse2(substitute(x)), "must be a data frame."))
   }
 }
-df_add_cols <- function(data, cols){
-  nms <- names(cols)
-  if (is.null(nms)){
-    stop("cols must be a named list")
-  }
-  for (i in seq_along(cols)){
-    data[[nms[i]]] <- cols[[i]]
-  }
-  data
-}
+
 which_in <- function(x, table){
   which_not_na(collapse::fmatch(x, table, overid = 2L, nomatch = NA_integer_))
 }
@@ -65,6 +56,14 @@ cheapr_rep_len <- function(x, length.out){
     sset(x, rep_len(attr(x, "row.names"), length.out))
   } else {
     rep(x, length.out = length.out)
+  }
+}
+
+cheapr_recycle <- function(x, length){
+  if (length == vector_length(x)){
+    x
+  } else {
+    cheapr_rep_len(x, length)
   }
 }
 
@@ -148,3 +147,115 @@ n_dots <- function(...){
 
 # Keep this in-case anyone was using it
 fill_with_na <- na_insert
+
+r_cut_breaks <- function(x, n){
+  check_length(n, 1)
+  stopifnot(n >= 2)
+  breaks <- get_breaks(x, n, pretty = FALSE)
+  adj <- diff(range(breaks)) * 0.001
+  breaks[1] <- breaks[1] - adj
+  breaks[length(breaks)] <- breaks[length(breaks)] + adj
+  breaks
+}
+
+# Is x an atomic type?
+# logical, integer, double, character, raw, complex
+# including Dates, factors and POSIXcts
+
+is_base_atomic <- function(x){
+  (
+    is.atomic(x) && (
+      !is.object(x) || inherits(x, c("Date", "POSIXct", "factor"))
+    )
+  ) ||
+    is.null(x)
+}
+
+combine_factors <- function(...){
+  if (nargs() == 0){
+    return(NULL)
+  }
+  if (nargs() == 1){
+    dots <- list(...)
+    if (!is.object(dots[[1L]]) && is.list(dots[[1L]])){
+      return(do.call(combine_factors, dots[[1L]]))
+    } else {
+      return(dots[[1L]])
+    }
+  }
+  get_levels <- function(x){
+    if (is.factor(x)) levels(x) else as.character(x)
+  }
+  to_char <- function(x){
+    if (is.factor(x)) factor_as_character(x) else as.character(x)
+  }
+  factors <- list(...)
+  levels <- new_list(length(factors))
+  characters <- new_list(length(factors))
+  exclude_na <- TRUE
+  for (i in seq_along(levels)){
+    f <- factors[[i]]
+    levels[[i]] <- get_levels(f)
+    characters[[i]] <- to_char(f)
+    exclude_na <- exclude_na && !any_na(levels(f))
+
+  }
+
+  # Unique combined levels
+  new_levels <- collapse::funique(collapse::vec(levels))
+
+  # Combine all factor elements (as character vectors)
+  factor_(unlist(characters, recursive = FALSE), levels = new_levels,
+          na_exclude = exclude_na)
+}
+
+# A very fast 1-D array frequency table
+cheapr_table <- function(x, names = TRUE, order = FALSE, na_exclude = FALSE){
+  if (is.factor(x)){
+    if (na_exclude){
+      f <- levels_drop_na(x)
+    } else if (any_na(x)){
+      f <- levels_add_na(x)
+    } else {
+      f <- x
+    }
+  } else {
+    f <- factor_(x, order = order, na_exclude = na_exclude)
+  }
+  lvls <- attr(f, "levels")
+  out <- tabulate(f, nbins = length(lvls))
+  if (names){
+    names(out) <- lvls
+  }
+  out
+}
+
+df_add_cols <- function(data, cols){
+  if (!(is.list(cols) && !is.null(names(cols)))){
+    stop("cols must be a named list")
+  }
+  N <- length(attr(data, "row.names"))
+  out <- unclass(data)
+  temp <- unclass(cols)
+  for (col in names(temp)){
+    out[[col]] <- cheapr_recycle(temp[[col]], length = N)
+  }
+  class(out) <- class(data)
+  out
+}
+
+# Just a wrapper with a cheaper alternative to `c.factor()`
+# cheapr_c <- function(..., .check = TRUE){
+#   dots <- list(...)
+#   if (.check){
+#     for (vec in dots){
+#       if (is.factor(vec)){
+#         return(combine_factors(dots))
+#       }
+#       if (is.object(vec)){
+#         return(do.call(c, dots))
+#       }
+#     }
+#   }
+#   `attributes<-`(collapse::vec(dots), NULL)
+# }

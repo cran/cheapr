@@ -1,4 +1,4 @@
-#include "cheapr_cpp.h"
+#include "cheapr.h"
 
 // Basic math operations by reference
 // All NA and NaN values are ignored
@@ -36,6 +36,9 @@ for (R_xlen_t i = 0; i < n; ++i) {                                          \
 for (R_xlen_t i = 0; i < n; ++i) {                                        \
   p_out[i] = p_out[i] != p_out[i] ? p_out[i] : _fun_(p_out[i]);           \
 }                                                                         \
+
+
+#define CHEAPR_TRUNC(x) (std::trunc(x) + 0.0)
 
 // Convert integer vector to plain double vector
 
@@ -136,10 +139,10 @@ SEXP cpp_set_trunc(SEXP x){
     double *p_out = REAL(out);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(std::trunc);
+      CHEAPR_MATH_REAL_LOOP(CHEAPR_TRUNC);
     } else {
       OMP_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(std::trunc);
+      CHEAPR_MATH_REAL_LOOP(CHEAPR_TRUNC);
     }
   }
   Rf_unprotect(1);

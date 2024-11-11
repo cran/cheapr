@@ -1,4 +1,4 @@
-#include "cheapr_cpp.h"
+#include "cheapr.h"
 
 #define CHEAPR_COUNT_NA(_ISNA_)                                \
 for (R_xlen_t i = 0; i < n; ++i){                              \
@@ -33,7 +33,7 @@ R_xlen_t na_count(SEXP x, bool recursive){
   int NP = 0;
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   bool do_parallel = n_cores > 1;
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
     break;
   }
@@ -49,8 +49,7 @@ R_xlen_t na_count(SEXP x, bool recursive){
     }
     break;
   }
-  case REALSXP: {
-    if (is_int64(x)){
+  case CHEAPR_INT64SXP: {
     long long *p_x = INTEGER64_PTR(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
@@ -59,7 +58,9 @@ R_xlen_t na_count(SEXP x, bool recursive){
       OMP_FOR_SIMD
       CHEAPR_COUNT_NA(cheapr_is_na_int64);
     }
-  } else {
+    break;
+  }
+  case REALSXP: {
     double *p_x = REAL(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
@@ -68,7 +69,6 @@ R_xlen_t na_count(SEXP x, bool recursive){
       OMP_FOR_SIMD
       CHEAPR_COUNT_NA(cheapr_is_na_dbl);
     }
-  }
     break;
   }
   case STRSXP: {
@@ -129,7 +129,7 @@ bool cpp_any_na(SEXP x, bool recursive){
   int NP = 0;
   R_xlen_t n = Rf_xlength(x);
   bool out = false;
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
     return out;
   }
@@ -139,14 +139,14 @@ bool cpp_any_na(SEXP x, bool recursive){
     CHEAPR_ANY_NA(cheapr_is_na_int);
     break;
   }
-  case REALSXP: {
-    if (is_int64(x)){
+  case CHEAPR_INT64SXP: {
     long long *p_x = INTEGER64_PTR(x);
     CHEAPR_ANY_NA(cheapr_is_na_int64);
-  } else {
+    break;
+  }
+  case REALSXP: {
     double *p_x = REAL(x);
     CHEAPR_ANY_NA(cheapr_is_na_dbl);
-  }
     break;
   }
   case STRSXP: {
@@ -194,21 +194,21 @@ bool cpp_all_na(SEXP x, bool return_true_on_empty, bool recursive){
       return false;
     }
   }
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case LGLSXP:
   case INTSXP: {
     int *p_x = INTEGER(x);
     CHEAPR_ALL_NA(cheapr_is_na_int);
     break;
   }
-  case REALSXP: {
-    if (is_int64(x)){
+  case CHEAPR_INT64SXP: {
     long long *p_x = INTEGER64_PTR(x);
     CHEAPR_ALL_NA(cheapr_is_na_int64);
-  } else {
+    break;
+  }
+  case REALSXP: {
     double *p_x = REAL(x);
     CHEAPR_ALL_NA(cheapr_is_na_dbl);
-  }
     break;
   }
   case STRSXP: {
@@ -253,7 +253,7 @@ SEXP cpp_is_na(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   SEXP out;
-  switch ( TYPEOF(x) ){
+  switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
     out = Rf_protect(Rf_allocVector(LGLSXP, 0));
     break;
@@ -273,29 +273,30 @@ SEXP cpp_is_na(SEXP x){
 
     break;
   }
+  case CHEAPR_INT64SXP: {
+    out = Rf_protect(Rf_allocVector(LGLSXP, n));
+    int *p_out = LOGICAL(out);
+    long long *p_x = INTEGER64_PTR(x);
+    if (n_cores > 1){
+      OMP_PARALLEL_FOR_SIMD
+      CHEAPR_VEC_IS_NA(cheapr_is_na_int64);
+    } else {
+      OMP_FOR_SIMD
+      CHEAPR_VEC_IS_NA(cheapr_is_na_int64);
+    }
+    break;
+  }
   case REALSXP: {
     out = Rf_protect(Rf_allocVector(LGLSXP, n));
     int *p_out = LOGICAL(out);
-    if (is_int64(x)){
-      long long *p_x = INTEGER64_PTR(x);
-      if (n_cores > 1){
-        OMP_PARALLEL_FOR_SIMD
-        CHEAPR_VEC_IS_NA(cheapr_is_na_int64);
-      } else {
-        OMP_FOR_SIMD
-        CHEAPR_VEC_IS_NA(cheapr_is_na_int64);
-      }
+    double *p_x = REAL(x);
+    if (n_cores > 1){
+      OMP_PARALLEL_FOR_SIMD
+      CHEAPR_VEC_IS_NA(cheapr_is_na_dbl);
     } else {
-      double *p_x = REAL(x);
-      if (n_cores > 1){
-        OMP_PARALLEL_FOR_SIMD
-        CHEAPR_VEC_IS_NA(cheapr_is_na_dbl);
-      } else {
-        OMP_FOR_SIMD
-        CHEAPR_VEC_IS_NA(cheapr_is_na_dbl);
-      }
+      OMP_FOR_SIMD
+      CHEAPR_VEC_IS_NA(cheapr_is_na_dbl);
     }
-
     break;
   }
   case STRSXP: {
@@ -706,68 +707,84 @@ SEXP cpp_matrix_row_na_counts(SEXP x){
   if (!Rf_isMatrix(x)){
     Rf_error("x must be a matrix");
   }
-  int num_row = Rf_nrows(x);
+  R_xlen_t num_row = Rf_nrows(x);
+  R_xlen_t num_col = Rf_ncols(x);
   R_xlen_t n = Rf_xlength(x);
+  bool new_col;
   SEXP out = Rf_protect(Rf_allocVector(INTSXP, num_row));
   int *p_out = INTEGER(out);
   memset(p_out, 0, num_row * sizeof(int));
-  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
-  bool do_parallel = n_cores > 1;
-#pragma omp parallel num_threads(n_cores) if(do_parallel)
-  switch ( TYPEOF(x) ){
-  case LGLSXP:
-  case INTSXP: {
-    int *p_x = INTEGER(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[i % num_row] += cheapr_is_na_int(p_x[i]);
+  if (num_row > 0 && num_col > 0){
+    switch ( CHEAPR_TYPEOF(x) ){
+    case LGLSXP:
+    case INTSXP: {
+      int *p_x = INTEGER(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[rowi] += cheapr_is_na_int(p_x[i]);
+      }
+      break;
     }
-    break;
-  }
-  case REALSXP: {
-    if (is_int64(x)){
-    long long *p_x = INTEGER64_PTR(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[i % num_row] += cheapr_is_na_int64(p_x[i]);
+    case REALSXP: {
+      double *p_x = REAL(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[rowi] += cheapr_is_na_dbl(p_x[i]);
+      }
+      break;
     }
-  } else {
-    double *p_x = REAL(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[i % num_row] += cheapr_is_na_dbl(p_x[i]);
+    case CHEAPR_INT64SXP: {
+      long long *p_x = INTEGER64_PTR(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[rowi] += cheapr_is_na_int64(p_x[i]);
+      }
+      break;
     }
-  }
-    break;
-  }
-  case STRSXP: {
-    const SEXP *p_x = STRING_PTR_RO(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[i % num_row] += cheapr_is_na_str(p_x[i]);
+    case STRSXP: {
+      const SEXP *p_x = STRING_PTR_RO(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[rowi] += cheapr_is_na_str(p_x[i]);
+      }
+      break;
     }
-    break;
-  }
-  case RAWSXP: {
-    break;
-  }
-  case CPLXSXP: {
-    Rcomplex *p_x = COMPLEX(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[i % num_row] += cheapr_is_na_cplx(p_x[i]);
+    case RAWSXP: {
+      break;
     }
-    break;
-  }
-  default: {
-    Rf_unprotect(1);
-    Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
-  }
+    case CPLXSXP: {
+      Rcomplex *p_x = COMPLEX(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[rowi] += cheapr_is_na_cplx(p_x[i]);
+      }
+      break;
+    }
+    default: {
+      Rf_unprotect(1);
+      Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
+    }
+    }
   }
   Rf_unprotect(1);
   return out;
@@ -777,69 +794,84 @@ SEXP cpp_matrix_col_na_counts(SEXP x){
   if (!Rf_isMatrix(x)){
     Rf_error("x must be a matrix");
   }
-  int num_row = Rf_nrows(x);
-  int num_col = Rf_ncols(x);
+  R_xlen_t num_row = Rf_nrows(x);
+  R_xlen_t num_col = Rf_ncols(x);
   R_xlen_t n = Rf_xlength(x);
+  bool new_col;
   SEXP out = Rf_protect(Rf_allocVector(INTSXP, num_col));
   int *p_out = INTEGER(out);
   memset(p_out, 0, num_col * sizeof(int));
-  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
-  bool do_parallel = n_cores > 1;
-#pragma omp parallel num_threads(n_cores) if(do_parallel)
-  switch ( TYPEOF(x) ){
-  case LGLSXP:
-  case INTSXP: {
-    int *p_x = INTEGER(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[int_div(i, num_row)] += cheapr_is_na_int(p_x[i]);
+  if (num_row > 0 && num_col > 0){
+    switch ( CHEAPR_TYPEOF(x) ){
+    case LGLSXP:
+    case INTSXP: {
+      int *p_x = INTEGER(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[coli] += cheapr_is_na_int(p_x[i]);
+      }
+      break;
     }
-    break;
-  }
-  case REALSXP: {
-    if (is_int64(x)){
-    long long *p_x = INTEGER64_PTR(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[int_div(i, num_row)] += cheapr_is_na_int64(p_x[i]);
+    case REALSXP: {
+      double *p_x = REAL(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[coli] += cheapr_is_na_dbl(p_x[i]);
+      }
+      break;
     }
-  } else {
-    double *p_x = REAL(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[int_div(i, num_row)] += cheapr_is_na_dbl(p_x[i]);
+    case CHEAPR_INT64SXP: {
+      long long *p_x = INTEGER64_PTR(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[coli] += cheapr_is_na_int64(p_x[i]);
+      }
+      break;
     }
-  }
-    break;
-  }
-  case STRSXP: {
-    const SEXP *p_x = STRING_PTR_RO(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[int_div(i, num_row)] += cheapr_is_na_str(p_x[i]);
+    case STRSXP: {
+      const SEXP *p_x = STRING_PTR_RO(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[coli] += cheapr_is_na_str(p_x[i]);
+      }
+      break;
     }
-    break;
-  }
-  case RAWSXP: {
-    break;
-  }
-  case CPLXSXP: {
-    Rcomplex *p_x = COMPLEX(x);
-#pragma omp for
-    for (R_xlen_t i = 0; i < n; ++i){
-#pragma omp atomic
-      p_out[int_div(i, num_row)] += cheapr_is_na_cplx(p_x[i]);
+    case RAWSXP: {
+      break;
     }
-    break;
-  }
-  default: {
-    Rf_unprotect(1);
-    Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
-  }
+    case CPLXSXP: {
+      Rcomplex *p_x = COMPLEX(x);
+      for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
+        new_col = rowi == num_row;
+        if (new_col){
+          ++coli;
+          rowi = 0;
+        }
+        p_out[coli] += cheapr_is_na_cplx(p_x[i]);
+      }
+      break;
+    }
+    default: {
+      Rf_unprotect(1);
+      Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
+    }
+    }
   }
   Rf_unprotect(1);
   return out;
