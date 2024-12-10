@@ -285,6 +285,13 @@ extern "C" SEXP _cheapr_cpp_loc_set_replace(SEXP x, SEXP where, SEXP what) {
     return cpp11::as_sexp(cpp_loc_set_replace(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(where), cpp11::as_cpp<cpp11::decay_t<SEXP>>(what)));
   END_CPP11
 }
+// scalars.cpp
+SEXP cpp_val_remove(SEXP x, SEXP value);
+extern "C" SEXP _cheapr_cpp_val_remove(SEXP x, SEXP value) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_val_remove(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(value)));
+  END_CPP11
+}
 // sequences.cpp
 SEXP cpp_int_sequence(SEXP size, SEXP from, SEXP by);
 extern "C" SEXP _cheapr_cpp_int_sequence(SEXP size, SEXP from, SEXP by) {
@@ -332,6 +339,13 @@ SEXP cpp_sequence_id(SEXP size);
 extern "C" SEXP _cheapr_cpp_sequence_id(SEXP size) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_sequence_id(cpp11::as_cpp<cpp11::decay_t<SEXP>>(size)));
+  END_CPP11
+}
+// sequences.cpp
+SEXP cpp_fixed_width_breaks(double start, double end, double n, bool pretty, bool expand_min, bool expand_max);
+extern "C" SEXP _cheapr_cpp_fixed_width_breaks(SEXP start, SEXP end, SEXP n, SEXP pretty, SEXP expand_min, SEXP expand_max) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_fixed_width_breaks(cpp11::as_cpp<cpp11::decay_t<double>>(start), cpp11::as_cpp<cpp11::decay_t<double>>(end), cpp11::as_cpp<cpp11::decay_t<double>>(n), cpp11::as_cpp<cpp11::decay_t<bool>>(pretty), cpp11::as_cpp<cpp11::decay_t<bool>>(expand_min), cpp11::as_cpp<cpp11::decay_t<bool>>(expand_max)));
   END_CPP11
 }
 // set_math.cpp
@@ -560,6 +574,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_df_col_na_counts",        (DL_FUNC) &_cheapr_cpp_df_col_na_counts,        1},
     {"_cheapr_cpp_df_row_na_counts",        (DL_FUNC) &_cheapr_cpp_df_row_na_counts,        1},
     {"_cheapr_cpp_drop_null",               (DL_FUNC) &_cheapr_cpp_drop_null,               2},
+    {"_cheapr_cpp_fixed_width_breaks",      (DL_FUNC) &_cheapr_cpp_fixed_width_breaks,      6},
     {"_cheapr_cpp_format_numeric_as_int64", (DL_FUNC) &_cheapr_cpp_format_numeric_as_int64, 1},
     {"_cheapr_cpp_gcd",                     (DL_FUNC) &_cheapr_cpp_gcd,                     5},
     {"_cheapr_cpp_gcd2",                    (DL_FUNC) &_cheapr_cpp_gcd2,                    4},
@@ -614,6 +629,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_set_trunc",               (DL_FUNC) &_cheapr_cpp_set_trunc,               1},
     {"_cheapr_cpp_sset_df",                 (DL_FUNC) &_cheapr_cpp_sset_df,                 2},
     {"_cheapr_cpp_sset_range",              (DL_FUNC) &_cheapr_cpp_sset_range,              4},
+    {"_cheapr_cpp_val_remove",              (DL_FUNC) &_cheapr_cpp_val_remove,              2},
     {"_cheapr_cpp_val_replace",             (DL_FUNC) &_cheapr_cpp_val_replace,             4},
     {"_cheapr_cpp_val_set_replace",         (DL_FUNC) &_cheapr_cpp_val_set_replace,         4},
     {"_cheapr_cpp_vec_length",              (DL_FUNC) &_cheapr_cpp_vec_length,              1},

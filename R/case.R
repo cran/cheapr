@@ -42,10 +42,8 @@
 #' @rdname case
 #' @export
 case <- function(..., .default = NULL){
-  conditions <- as.list(match.call())[-1L]
-  default_val <- eval(conditions[[".default"]], envir = parent.frame())
-  conditions <- conditions[-match(".default", names(conditions),
-                                  nomatch = length(conditions) + 1L)]
+  conditions <- exprs(...)
+  default_val <- .default
   n_conditions <- length(conditions)
 
   if (n_conditions == 0){
@@ -92,6 +90,8 @@ case <- function(..., .default = NULL){
     out[true_locs] <- rhs[true_locs]
   }
 
+  # Initialise a logical that will keep track of
+  # which conditions have been met
   lgl_or <- r_copy(lgl)
 
   if (n_conditions >= 2){
@@ -113,6 +113,11 @@ case <- function(..., .default = NULL){
       if (!length(rhs) %in% c(1, out_size)){
         stop("rhs must be of length 1 or length of lhs")
       }
+
+      # 1. Copy elements from user condition into our temporary lgl3 vector
+      # 2. Replace previous evaluated `TRUE` elements with `FALSE`
+      # to keep priority of former conditions
+      # 3. Do `lgl_or | lgl` to keep track of evaluated `TRUE` elements
 
       cpp_set_copy_elements(source = lgl, target = lgl3)
       cpp_loc_set_replace(lgl3, val_find(lgl_or, TRUE), FALSE)
@@ -153,11 +158,7 @@ case <- function(..., .default = NULL){
 #' @rdname case
 #' @export
 val_match <- function(.x, ..., .default = NULL){
-  exprs <- as.list(match.call())[-1L]
-
-  # Remove .x and .default from expression list
-  exprs <- exprs[-match(".x", names(exprs), nomatch = length(exprs) + 1L)]
-  exprs <- exprs[-match(".default", names(exprs), nomatch = length(exprs) + 1L)]
+  exprs <- exprs(...)
 
   N <- length(.x)
   n_exprs <- length(exprs)
@@ -203,11 +204,18 @@ val_match <- function(.x, ..., .default = NULL){
 
     rhs_all_scalars <- rhs_all_scalars && length(rhs) == 1
     all_same_type <- all_same_type &&
-      identical(typeof(.x), typeof(lhs)) &&
-      identical(typeof(.x), typeof(rhs))
+      identical(typeof(.x), typeof(lhs))
   }
 
-  if (rhs_all_scalars && (n_exprs >= 5 || !all_same_type)){
+  # Are all LHS elements the same type as `x` and
+  # are all RHS elements the same type?
+  all_same_type <- all_same_type &&
+    collapse::fnunique(
+      vapply(if (is.null(.default)) rhs_list else c(rhs_list, list(.default)) , typeof, "",
+             USE.NAMES = FALSE)
+    ) == 1L
+
+  if (rhs_all_scalars && (n_exprs > 3 || !all_same_type)){
 
     # Pre-allocate key-value pairs
       keys <- rep_len(.x[NA_integer_], n_exprs)
@@ -243,7 +251,11 @@ val_match <- function(.x, ..., .default = NULL){
     if (!is.null(.default)){
       out <- if (length(.default) != 1) .default else rep_len(.default, N)
     } else {
-      out <- rep_len(.x[NA_integer_], N)
+      if (n_exprs == 0){
+        out <- rep_len(.x[NA_integer_], N)
+      } else {
+        out <- rep_len(rhs_list[[1L]][NA_integer_], N)
+      }
     }
 
     for (i in seq_along(exprs)){

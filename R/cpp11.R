@@ -160,6 +160,10 @@ cpp_loc_set_replace <- function(x, where, what) {
   .Call(`_cheapr_cpp_loc_set_replace`, x, where, what)
 }
 
+cpp_val_remove <- function(x, value) {
+  .Call(`_cheapr_cpp_val_remove`, x, value)
+}
+
 cpp_int_sequence <- function(size, from, by) {
   .Call(`_cheapr_cpp_int_sequence`, size, from, by)
 }
@@ -186,6 +190,10 @@ cpp_lead_sequence <- function(size, k, partial) {
 
 cpp_sequence_id <- function(size) {
   .Call(`_cheapr_cpp_sequence_id`, size)
+}
+
+cpp_fixed_width_breaks <- function(start, end, n, pretty, expand_min, expand_max) {
+  .Call(`_cheapr_cpp_fixed_width_breaks`, start, end, n, pretty, expand_min, expand_max)
 }
 
 cpp_set_abs <- function(x) {
