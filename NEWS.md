@@ -1,3 +1,12 @@
+# cheapr 1.0.0
+
+- New functions `as_df`, `fast_df` and `cheapr_table`.
+
+- `count_val`, `unused_levels` and `used_levels` have been removed and 
+replaced by `val_count`, `levels_unused` and `levels_used` respectively.
+
+- Deprecated `cut_numeric`, `enframe_` and `deframe_`.
+
 # cheapr 0.9.92
 
 - Fixed additional issues flagged by R checks.
