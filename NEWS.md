@@ -1,3 +1,15 @@
+# cheapr 1.0.1
+
+- R version 4.0.0 now required as also required by cpp11.
+
+- New function `int_sign` for integer-based signs.
+
+- `overview` now prints slightly differently. Specifically 'class'
+is not printed. Time series overviews now return and print the growth rate.
+
+- cheapr's internal `cpp_list_as_df` now always returns a data frame with 
+names, even when supplied an empty list.
+
 # cheapr 1.0.0
 
 - New functions `as_df`, `fast_df` and `cheapr_table`.

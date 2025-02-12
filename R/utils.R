@@ -1,6 +1,7 @@
 #' @noRd
 
 # Like deparse1 but has a cutoff in case of massive strings
+
 deparse2 <- function(expr, collapse = " ", width.cutoff = 500L, nlines = 10L, ...){
   paste(deparse(expr, width.cutoff, nlines = nlines, ...), collapse = collapse)
 }
@@ -148,13 +149,17 @@ n_dots <- function(...){
 # Keep this in-case anyone was using it
 fill_with_na <- na_insert
 
+# The breaks the `cut(x, n)` produces
 r_cut_breaks <- function(x, n){
   check_length(n, 1)
-  stopifnot(n >= 2)
+  if (is.na(n) || n < 2){
+    stop(paste("number of breaks must be >= 2, not", n))
+  }
   breaks <- get_breaks(x, n, pretty = FALSE, expand_min = FALSE, expand_max = FALSE)
-  adj <- diff(range(breaks)) * 0.001
+  nb <- length(breaks)
+  adj <- (breaks[nb] - breaks[1]) * 0.001
   breaks[1] <- breaks[1] - adj
-  breaks[length(breaks)] <- breaks[length(breaks)] + adj
+  breaks[nb] <- breaks[nb] + adj
   breaks
 }
 
@@ -171,42 +176,46 @@ is_base_atomic <- function(x){
     is.null(x)
 }
 
-combine_factors <- function(...){
-  if (nargs() == 0){
-    return(NULL)
+# If args is a plain list of items then extract the first element of
+# the top list
+
+as_list_of <- function(...){
+  dots <- list(...)
+  if (length(dots) == 1 && !is.object(dots[[1L]]) && is.list(dots[[1L]])){
+    dots[[1L]]
+  } else {
+    dots
   }
-  if (nargs() == 1){
-    dots <- list(...)
-    if (!is.object(dots[[1L]]) && is.list(dots[[1L]])){
-      return(do.call(combine_factors, dots[[1L]]))
-    } else {
-      return(dots[[1L]])
-    }
-  }
+}
+
+# Combine levels of factors
+# Converts non factors into character vectors
+combine_levels <- function(...){
+  dots <- as_list_of(...)
   get_levels <- function(x){
-    if (is.factor(x)) levels(x) else as.character(x)
+    if (is.factor(x)) attr(x, "levels", TRUE) else as.character(x)
+  }
+  # Unique combined levels
+  levels <- as.character(unlist(lapply(dots, get_levels), recursive = FALSE))
+  collapse::funique(levels)
+}
+
+combine_factors <- function(...){
+  factors <- as_list_of(...)
+  if (length(factors) == 1){
+    return(factors[[1L]])
   }
   to_char <- function(x){
     if (is.factor(x)) factor_as_character(x) else as.character(x)
   }
-  factors <- list(...)
-  levels <- new_list(length(factors))
-  characters <- new_list(length(factors))
-  exclude_na <- TRUE
-  for (i in seq_along(levels)){
-    f <- factors[[i]]
-    levels[[i]] <- get_levels(f)
-    characters[[i]] <- to_char(f)
-    exclude_na <- exclude_na && !any_na(levels(f))
-
-  }
-
-  # Unique combined levels
-  new_levels <- collapse::funique(collapse::vec(levels))
+  combined_levels <- do.call(combine_levels, factors)
+  characters <- lapply(factors, to_char)
 
   # Combine all factor elements (as character vectors)
-  factor_(unlist(characters, recursive = FALSE), levels = new_levels,
-          na_exclude = exclude_na)
+  factor_(
+    unlist(characters, recursive = FALSE), levels = combined_levels,
+    na_exclude = !any_na(combined_levels)
+  )
 }
 
 
@@ -218,7 +227,7 @@ df_add_cols <- function(data, cols){
   out <- unclass(data)
   temp <- unclass(cols)
   for (col in names(temp)){
-    out[[col]] <- cheapr_recycle(temp[[col]], length = N)
+    out[[col]] <- if (is.null(temp[[col]])) NULL else cheapr_recycle(temp[[col]], length = N)
   }
   class(out) <- class(data)
   out

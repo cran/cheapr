@@ -252,6 +252,10 @@ cpp_set_round <- function(x, digits) {
   .Call(`_cheapr_cpp_set_round`, x, digits)
 }
 
+cpp_int_sign <- function(x) {
+  .Call(`_cheapr_cpp_int_sign`, x)
+}
+
 cpp_sset_range <- function(x, from, to, by) {
   .Call(`_cheapr_cpp_sset_range`, x, from, to, by)
 }
@@ -294,6 +298,10 @@ cpp_set_copy_elements <- function(source, target) {
 
 cpp_set_or <- function(x, y) {
   .Call(`_cheapr_cpp_set_or`, x, y)
+}
+
+cpp_growth_rate <- function(x) {
+  .Call(`_cheapr_cpp_growth_rate`, x)
 }
 
 cpp_which_ <- function(x, invert) {
