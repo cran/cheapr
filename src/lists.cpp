@@ -1,6 +1,6 @@
 #include "cheapr.h"
 
-R_xlen_t cpp_unnested_length(SEXP x){
+R_xlen_t unnested_length(SEXP x){
   if (!Rf_isVectorList(x)){
     return Rf_xlength(x);
   }
@@ -8,14 +8,14 @@ R_xlen_t cpp_unnested_length(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   R_xlen_t out = 0;
   for (R_xlen_t i = 0; i < n; ++i){
-    out += Rf_isVectorList(p_x[i]) ? cpp_unnested_length(p_x[i]) : Rf_xlength(p_x[i]);
+    out += Rf_isVectorList(p_x[i]) ? unnested_length(p_x[i]) : Rf_xlength(p_x[i]);
   }
   return out;
 }
 
 [[cpp11::register]]
-SEXP cpp_r_unnested_length(SEXP x){
-  return xlen_to_r(cpp_unnested_length(x));
+SEXP cpp_unnested_length(SEXP x){
+  return xlen_to_r(unnested_length(x));
 }
 
 [[cpp11::register]]
@@ -30,11 +30,11 @@ SEXP cpp_lengths(SEXP x, bool names) {
   } else {
     const SEXP* p_x = VECTOR_PTR_RO(x);
     for (R_xlen_t i = 0; i < n; ++i) {
-      p_out[i] = cpp_vec_length(p_x[i]);
+      p_out[i] = vec_length(p_x[i]);
     }
   }
   if (names){
-    cpp_copy_names(x, out, true);
+    cpp_copy_names(x, out, false);
   }
   Rf_unprotect(1);
   return out;
@@ -110,23 +110,16 @@ SEXP cpp_list_as_df(SEXP x) {
   int NP = 0; // Number of protects
   SEXP out = Rf_protect(cpp_drop_null(x, true)); ++NP;
   int n_items = Rf_length(out);
-  if (Rf_inherits(x, "data.frame")){
+  if (is_df(x)){
     N = cpp_df_nrow(x);
   } else if (n_items == 0){
     N = 0;
   } else {
-    N = cpp_vec_length(VECTOR_ELT(out, 0));
+    N = vec_length(VECTOR_ELT(out, 0));
   }
 
   SEXP df_str = Rf_protect(Rf_mkString("data.frame")); ++NP;
-  SEXP row_names;
-  if (N > 0){
-    row_names = Rf_protect(Rf_allocVector(INTSXP, 2)); ++NP;
-    INTEGER(row_names)[0] = NA_INTEGER;
-    INTEGER(row_names)[1] = -N;
-  } else {
-    row_names = Rf_protect(Rf_allocVector(INTSXP, 0)); ++NP;
-  }
+  SEXP row_names = create_df_row_names(N);
 
   // If no names then add names
   if (Rf_isNull(Rf_getAttrib(out, R_NamesSymbol))){
@@ -172,21 +165,21 @@ SEXP cpp_list_as_df(SEXP x) {
 //   }
 // }
 
-// SEXP cpp_shallow_copy(SEXP x){
-//   if (Rf_isVectorList(x)){
-//     R_xlen_t n = Rf_xlength(x);
-//     SEXP out = Rf_protect(Rf_allocVector(VECSXP, n));
-//     const SEXP *p_x = VECTOR_PTR_RO(x);
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       SET_VECTOR_ELT(out, i, p_x[i]);
-//     }
-//     SHALLOW_DUPLICATE_ATTRIB(out, x);
-//     Rf_unprotect(1);
-//     return out;
-//   } else {
-//     return x;
-//   }
-// }
+SEXP shallow_copy(SEXP x){
+  if (Rf_isVectorList(x)){
+    R_xlen_t n = Rf_xlength(x);
+    SEXP out = Rf_protect(Rf_allocVector(VECSXP, n));
+    const SEXP *p_x = VECTOR_PTR_RO(x);
+    for (R_xlen_t i = 0; i < n; ++i){
+      SET_VECTOR_ELT(out, i, p_x[i]);
+    }
+    SHALLOW_DUPLICATE_ATTRIB(out, x);
+    Rf_unprotect(1);
+    return out;
+  } else {
+    return x;
+  }
+}
 
 // #define cheapr_cast_temp(x, y) cpp11::function cpp11::package("cheapr")["cheapr_cast"];
 

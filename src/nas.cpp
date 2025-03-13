@@ -1,5 +1,9 @@
 #include "cheapr.h"
 
+// NA handling functions
+// Author: Nick Christofides
+
+
 #define CHEAPR_COUNT_NA(_ISNA_)                                \
 for (R_xlen_t i = 0; i < n; ++i){                              \
   count += _ISNA_(p_x[i]);                                     \
@@ -108,7 +112,7 @@ R_xlen_t na_count(SEXP x, bool recursive){
   }
   }
   default: {
-    SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](x)); ++NP;
+    SEXP is_missing = Rf_protect(cheapr_is_na(x)); ++NP;
     SEXP r_true = Rf_protect(Rf_ScalarLogical(true)); ++NP;
     count = scalar_count(is_missing, r_true, true);
     break;
@@ -172,7 +176,7 @@ bool cpp_any_na(SEXP x, bool recursive){
   }
   }
   default: {
-    SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](x)); ++NP;
+    SEXP is_missing = Rf_protect(cheapr_is_na(x)); ++NP;
     SEXP any_missing = Rf_protect(cpp11::package("base")["any"](is_missing)); ++NP;
     out = Rf_asLogical(any_missing);
     break;
@@ -234,7 +238,7 @@ bool cpp_all_na(SEXP x, bool return_true_on_empty, bool recursive){
   }
   }
   default: {
-    SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](x)); ++NP;
+    SEXP is_missing = Rf_protect(cheapr_is_na(x)); ++NP;
     SEXP all_missing = Rf_protect(cpp11::package("base")["all"](is_missing)); ++NP;
     out = Rf_asLogical(all_missing);
     break;
@@ -353,7 +357,7 @@ SEXP cpp_is_na(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_df_row_na_counts(SEXP x){
-  if (!Rf_isFrame(x)){
+  if (!is_df(x)){
     Rf_error("x must be a data frame");
   }
   const SEXP *p_x = VECTOR_PTR_RO(x);
@@ -418,7 +422,7 @@ SEXP cpp_df_row_na_counts(SEXP x){
     }
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](p_x[j])); ++NP;
+      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j])); ++NP;
       if (Rf_xlength(is_missing) != num_row){
         int int_nrows = num_row;
         int element_length = Rf_xlength(is_missing); ++NP;
@@ -451,7 +455,7 @@ SEXP cpp_df_row_na_counts(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_df_col_na_counts(SEXP x){
-  if (!Rf_isFrame(x)){
+  if (!is_df(x)){
     Rf_error("x must be a data frame");
   }
   const SEXP *p_x = VECTOR_PTR_RO(x);
@@ -465,7 +469,7 @@ SEXP cpp_df_col_na_counts(SEXP x){
     switch ( TYPEOF(p_x[j]) ){
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](p_x[j]));
+      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j]));
       ++NP;
       if (Rf_xlength(is_missing) != num_row){
         int int_nrows = num_row;
@@ -498,7 +502,7 @@ SEXP cpp_df_col_na_counts(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_col_any_na(SEXP x, bool names){
-  if (!Rf_isFrame(x)){
+  if (!is_df(x)){
     Rf_error("x must be a data frame");
   }
   const SEXP *p_x = VECTOR_PTR_RO(x);
@@ -514,7 +518,7 @@ SEXP cpp_col_any_na(SEXP x, bool names){
     switch ( TYPEOF(p_x[j]) ){
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](p_x[j]));
+      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j]));
       cpp11::function r_any = cpp11::package("base")["any"];
       ++NP;
       if (Rf_xlength(is_missing) != num_row){
@@ -548,14 +552,14 @@ SEXP cpp_col_any_na(SEXP x, bool names){
     }
     }
   }
-  if (names) cpp_copy_names(x, out, true);
+  if (names) cpp_copy_names(x, out, false);
   Rf_unprotect(NP);
   return out;
 }
 
 [[cpp11::register]]
 SEXP cpp_col_all_na(SEXP x, bool names){
-  if (!Rf_isFrame(x)){
+  if (!is_df(x)){
     Rf_error("x must be a data frame");
   }
   const SEXP *p_x = VECTOR_PTR_RO(x);
@@ -571,7 +575,7 @@ SEXP cpp_col_all_na(SEXP x, bool names){
     switch ( TYPEOF(p_x[j]) ){
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cpp11::package("cheapr")["is_na"](p_x[j]));
+      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j]));
       cpp11::function r_all = cpp11::package("base")["all"];
       ++NP;
       if (Rf_xlength(is_missing) != num_row){
@@ -605,7 +609,7 @@ SEXP cpp_col_all_na(SEXP x, bool names){
     }
     }
   }
-  if (names) cpp_copy_names(x, out, true);
+  if (names) cpp_copy_names(x, out, false);
   Rf_unprotect(NP);
   return out;
 }
@@ -614,7 +618,7 @@ SEXP cpp_col_all_na(SEXP x, bool names){
 //TO-DO - Rewrite this but for all_na()
 // More likely to be faster for the all_na case
 // SEXP cpp_row_any_na(SEXP x, bool names){
-//   if (!Rf_isFrame(x)){
+//   if (!is_df(x)){
 //     Rf_error("x must be a data frame");
 //   }
 //   const SEXP *p_x = VECTOR_PTR_RO(x);
@@ -886,7 +890,7 @@ SEXP matrix_colnames(SEXP x) {
 [[cpp11::register]]
 SEXP cpp_row_na_counts(SEXP x, bool names){
   bool is_matrix = Rf_isMatrix(x);
-  bool is_data_frame = Rf_isFrame(x);
+  bool is_data_frame = is_df(x);
 
   if (!is_matrix && !is_data_frame){
     Rf_error("x must be a matrix or data frame");
@@ -915,7 +919,7 @@ SEXP cpp_row_na_counts(SEXP x, bool names){
 [[cpp11::register]]
 SEXP cpp_col_na_counts(SEXP x, bool names){
   bool is_matrix = Rf_isMatrix(x);
-  bool is_data_frame = Rf_isFrame(x);
+  bool is_data_frame = is_df(x);
 
   if (!is_matrix && !is_data_frame){
     Rf_error("x must be a matrix or data frame");
@@ -932,7 +936,7 @@ SEXP cpp_col_na_counts(SEXP x, bool names){
     }
   } else {
     out = Rf_protect(cpp_df_col_na_counts(x)); ++NP;
-    if (names) cpp_copy_names(x, out, true);
+    if (names) cpp_copy_names(x, out, false);
   }
   Rf_unprotect(NP);
   return out;

@@ -1,5 +1,8 @@
 #include "cheapr.h"
 
+// Lag vectors and lists recursively, in place, with custom order and run lengths
+// Author: Nick Christofides
+
 // Internal fast check for valid order values (here they are 0-indexed)
 // Where rng = length(x) - 1
 void check_order_value(unsigned int x, unsigned int rng, int n_prot){
@@ -291,7 +294,7 @@ SEXP cpp_lag(SEXP x, R_xlen_t k, SEXP fill, bool set, bool recursive) {
         ++NP;
         SEXP tempv = Rf_protect(Rf_allocVector(VECSXP, 1));
         ++NP;
-        SEXP* __restrict__ p_lag = VECTOR_PTR(lag_temp);
+        const SEXP* __restrict__ p_lag = VECTOR_PTR_RO(lag_temp);
         // Positive lags
         if (k >= 0){
           for (R_xlen_t i = 0; i < k; ++i) {

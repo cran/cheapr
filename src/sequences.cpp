@@ -34,7 +34,7 @@ SEXP cpp_int_sequence(SEXP size, SEXP from, SEXP by) {
   }
   SEXP out = Rf_protect(Rf_allocVector(INTSXP, out_size));
   int *p_out = INTEGER(out);
-  R_xlen_t index = 0;
+  R_xlen_t index = 0, interrupt_counter = 0;
   int fj;
   int bj;
   int start;
@@ -66,9 +66,14 @@ SEXP cpp_int_sequence(SEXP size, SEXP from, SEXP by) {
         Rf_error("by contains NA values");
       }
       for (int i = 0; i < seq_size; ++i){
+        if (interrupt_counter == 100000000){
+          R_CheckUserInterrupt();
+          interrupt_counter = 0;
+        }
         p_out[index] = start;
         start += increment;
         ++index;
+        ++interrupt_counter;
       }
     }
   }
@@ -95,7 +100,7 @@ SEXP cpp_dbl_sequence(SEXP size, SEXP from, SEXP by) {
   }
   SEXP out = Rf_protect(Rf_allocVector(REALSXP, out_size));
   double *p_out = REAL(out);
-  R_xlen_t index = 0;
+  R_xlen_t index = 0, interrupt_counter = 0;
   int fj;
   int bj;
   int seq_size;
@@ -106,6 +111,7 @@ SEXP cpp_dbl_sequence(SEXP size, SEXP from, SEXP by) {
     double *p_from = REAL(from);
     double *p_by = REAL(by);
     for (int j = 0; j < size_n; ++j){
+
       seq_size = p_size[j];
       fj = j % from_n;
       bj = j % by_n;
@@ -120,8 +126,13 @@ SEXP cpp_dbl_sequence(SEXP size, SEXP from, SEXP by) {
         Rf_error("by contains NA values");
       }
       for (int i = 0; i < seq_size; ++i){
+        if (interrupt_counter == 100000000){
+          R_CheckUserInterrupt();
+          interrupt_counter = 0;
+        }
         p_out[index] = ( start + (i * increment) );
         ++index;
+        ++interrupt_counter;
       }
     }
   }
@@ -380,6 +391,24 @@ SEXP cpp_sequence_id(SEXP size){
   }
   Rf_unprotect(2);
   return out;
+}
+
+SEXP cpp_seq_len(R_xlen_t n){
+  if (n > integer_max_){
+    SEXP out = Rf_protect(Rf_allocVector(REALSXP, n));
+    double *p_out = REAL(out);
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i) p_out[i] = 1.0 + i;
+    Rf_unprotect(1);
+    return out;
+  } else {
+    SEXP out = Rf_protect(Rf_allocVector(INTSXP, n));
+    int *p_out = INTEGER(out);
+    OMP_FOR_SIMD
+    for (int i = 0; i < n; ++i) p_out[i] = i + 1;
+    Rf_unprotect(1);
+    return out;
+  }
 }
 
 bool is_whole_number(double x, double tolerance){

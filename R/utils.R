@@ -163,17 +163,18 @@ r_cut_breaks <- function(x, n){
   breaks
 }
 
-# Is x an atomic type?
+# Is x a simple atomic type?
 # logical, integer, double, character, raw, complex
 # including Dates, factors and POSIXcts
 
-is_base_atomic <- function(x){
-  (
-    is.atomic(x) && (
-      !is.object(x) || inherits(x, c("Date", "POSIXct", "factor"))
-    )
-  ) ||
-    is.null(x)
+# Simple here means it's
+# a) atomic
+# b) attributes aren't data-dependent and so can be all copied
+
+is_simple_atomic <- function(x){
+  is.atomic(x) && (
+    !is.object(x) || inherits(x, c("Date", "POSIXct", "factor", "integer64"))
+  )
 }
 
 # If args is a plain list of items then extract the first element of
@@ -238,6 +239,9 @@ exprs <- function(...){
   as.list(substitute(alist(...)))[-1]
 }
 
+# Sort of the inverse of %||%
+`%!||%` <- function(x, y) if (x) NULL else y
+
 # Just a wrapper with a cheaper alternative to `c.factor()`
 # cheapr_c <- function(..., .check = TRUE){
 #   dots <- list(...)
@@ -253,3 +257,15 @@ exprs <- function(...){
 #   }
 #   `attributes<-`(collapse::vec(dots), NULL)
 # }
+
+# Turn negative indices to positives
+neg_indices_to_pos <- function(exclude, n){
+  if (n == 0){
+    integer()
+  } else {
+    which_not_in(
+      seq.int(from = -1L, to = -as.integer(n), by = -1L),
+      as.integer(exclude)
+    )
+  }
+}

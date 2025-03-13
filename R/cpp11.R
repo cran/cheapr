@@ -24,6 +24,14 @@ cpp_set_add_attributes <- function(x, attributes, add) {
   .Call(`_cheapr_cpp_set_add_attributes`, x, attributes, add)
 }
 
+cpp_shallow_duplicate_attrs <- function(source, target) {
+  invisible(.Call(`_cheapr_cpp_shallow_duplicate_attrs`, source, target))
+}
+
+cpp_copy_most_attrs <- function(source, target) {
+  invisible(.Call(`_cheapr_cpp_copy_most_attrs`, source, target))
+}
+
 cpp_gcd2 <- function(x, y, tol, na_rm) {
   .Call(`_cheapr_cpp_gcd2`, x, y, tol, na_rm)
 }
@@ -76,8 +84,8 @@ cpp_lag2 <- function(x, lag, order, run_lengths, fill, recursive) {
   .Call(`_cheapr_cpp_lag2`, x, lag, order, run_lengths, fill, recursive)
 }
 
-cpp_r_unnested_length <- function(x) {
-  .Call(`_cheapr_cpp_r_unnested_length`, x)
+cpp_unnested_length <- function(x) {
+  .Call(`_cheapr_cpp_unnested_length`, x)
 }
 
 cpp_lengths <- function(x, names) {
@@ -256,16 +264,40 @@ cpp_int_sign <- function(x) {
   .Call(`_cheapr_cpp_int_sign`, x)
 }
 
-cpp_sset_range <- function(x, from, to, by) {
-  .Call(`_cheapr_cpp_sset_range`, x, from, to, by)
+clean_indices <- function(indices, xn) {
+  .Call(`_cheapr_clean_indices`, indices, xn)
+}
+
+cpp_sset <- function(x, indices) {
+  .Call(`_cheapr_cpp_sset`, x, indices)
+}
+
+cpp_rev <- function(x, set) {
+  .Call(`_cheapr_cpp_rev`, x, set)
+}
+
+cpp_df_select <- function(x, locs) {
+  .Call(`_cheapr_cpp_df_select`, x, locs)
+}
+
+cpp_df_slice <- function(x, indices) {
+  .Call(`_cheapr_cpp_df_slice`, x, indices)
+}
+
+cpp_df_subset <- function(x, i, j, keep_attrs) {
+  .Call(`_cheapr_cpp_df_subset`, x, i, j, keep_attrs)
 }
 
 cpp_sset_df <- function(x, indices) {
   .Call(`_cheapr_cpp_sset_df`, x, indices)
 }
 
-cpp_vec_length <- function(x) {
-  .Call(`_cheapr_cpp_vec_length`, x)
+cpp_vector_length <- function(x) {
+  .Call(`_cheapr_cpp_vector_length`, x)
+}
+
+cpp_address <- function(x) {
+  .Call(`_cheapr_cpp_address`, x)
 }
 
 r_copy <- function(x) {
@@ -278,10 +310,6 @@ var_sum_squared_diff <- function(x, mu) {
 
 cpp_bin <- function(x, breaks, codes, right, include_lowest, include_oob) {
   .Call(`_cheapr_cpp_bin`, x, breaks, codes, right, include_lowest, include_oob)
-}
-
-cpp_rev <- function(x, set) {
-  .Call(`_cheapr_cpp_rev`, x, set)
 }
 
 cpp_if_else <- function(condition, yes, no, na) {

@@ -8,9 +8,6 @@
 #define R_NO_REMAP
 #endif
 
-#ifndef VECTOR_PTR
-#define VECTOR_PTR(x) ((SEXP *) DATAPTR(x))
-#endif
 #ifndef VECTOR_PTR_RO
 #define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
 #endif
@@ -88,14 +85,44 @@
 #define CHEAPR_TYPEOF(x)  ( (SEXPTYPE) (Rf_inherits(x, "integer64") ? CHEAPR_INT64SXP : TYPEOF(x)) )
 #endif
 
+inline bool is_int64(SEXP x){
+  return Rf_isReal(x) && Rf_inherits(x, "integer64");
+}
+
+inline bool is_df(SEXP x){
+  return Rf_inherits(x, "data.frame");
+}
+
+inline R_xlen_t r_length(SEXP x){
+  return Rf_asReal(cpp11::package("base")["length"](x));
+}
+
+inline cpp11::function base_match = cpp11::package("base")["match"];
+inline cpp11::function cheapr_sset = cpp11::package("cheapr")["sset"];
+inline cpp11::function cheapr_is_na = cpp11::package("cheapr")["is_na"];
+inline cpp11::function base_colon = cpp11::package("base")[":"];
+
+
+// Definition of simple atomic vector is one in which
+// it is both atomic and all attributes data-independent
+inline bool is_simple_atomic_vec(SEXP x){
+  return (
+      Rf_isVectorAtomic(x) && (
+          !Rf_isObject(x) || (
+              Rf_inherits(x, "Date") || Rf_inherits(x, "factor") ||
+              Rf_inherits(x, "POSIXct")
+          )
+      )
+  );
+}
+
 int num_cores();
 SEXP cpp_which_(SEXP x, bool invert);
 SEXP cpp_missing_row(SEXP x, double threshold, bool threshold_is_prop);
 int int_div(int x, int y);
 R_xlen_t cpp_df_nrow(SEXP x);
-R_xlen_t cpp_unnested_length(SEXP x);
 SEXP xlen_to_r(R_xlen_t x);
-R_xlen_t cpp_vec_length(SEXP x);
+R_xlen_t vec_length(SEXP x);
 SEXP r_address(SEXP x);
 R_xlen_t scalar_count(SEXP x, SEXP value, bool recursive);
 SEXP cpp_list_as_df(SEXP x);
@@ -108,18 +135,22 @@ SEXP compact_seq_data(SEXP x);
 bool is_compact_seq(SEXP x);
 R_xlen_t na_count(SEXP x, bool recursive);
 bool cpp_any_na(SEXP x, bool recursive);
-bool is_int64(SEXP x);
 SEXP cpp_int64_to_double(SEXP x);
 SEXP cpp_numeric_to_int64(SEXP x);
 SEXP cpp_int64_to_numeric(SEXP x);
 SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add);
+SEXP cpp_set_rm_attributes(SEXP x);
 void cpp_copy_names(SEXP source, SEXP target, bool deep_copy);
 void cpp_copy_attributes(SEXP source, SEXP target, bool deep_copy);
-SEXP cpp_sset_df(SEXP x, SEXP indices);
 SEXP coerce_vector(SEXP source, SEXPTYPE type);
 bool implicit_na_coercion(SEXP x, SEXP target);
 SEXP cpp_val_find(SEXP x, SEXP value, bool invert, SEXP n_values);
 double round_nearest_even(double x);
 SEXP cpp_set_divide(SEXP x, SEXP y);
+SEXP cpp_val_remove(SEXP x, SEXP value);
+SEXP cpp_seq_len(R_xlen_t n);
+SEXP create_df_row_names(int n);
+SEXP shallow_copy(SEXP x);
+SEXP exclude_locs(SEXP exclude, R_xlen_t xn);
 
 #endif

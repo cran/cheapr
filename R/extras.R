@@ -258,7 +258,7 @@ na_insert <- function(x, n = NULL, prop = NULL){
 }
 #' @rdname extras
 #' @export
-vector_length <- cpp_vec_length
+vector_length <- cpp_vector_length
 #' @rdname extras
 #' @export
 cheapr_var <- function(x, na.rm = TRUE){
@@ -287,8 +287,8 @@ cheapr_var <- function(x, na.rm = TRUE){
 #' @rdname extras
 #' @export
 cheapr_rev <- function(x){
-  if (is_base_atomic(x)){
-    .Call(`_cheapr_cpp_rev`, x, FALSE)
+  if (is_simple_atomic(x)){
+    .Call(`_cheapr_cpp_sset`, x, length(x):0)
   } else {
     sset(x, vector_length(x):0)
   }

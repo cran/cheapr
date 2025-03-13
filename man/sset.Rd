@@ -2,9 +2,6 @@
 % Please edit documentation in R/sset.R
 \name{sset}
 \alias{sset}
-\alias{sset.Date}
-\alias{sset.POSIXct}
-\alias{sset.factor}
 \alias{sset.data.frame}
 \alias{sset.tbl_df}
 \alias{sset.POSIXlt}
@@ -14,21 +11,15 @@
 \usage{
 sset(x, ...)
 
-\method{sset}{Date}(x, i, ...)
+\method{sset}{data.frame}(x, i = NULL, j = NULL, ...)
 
-\method{sset}{POSIXct}(x, i, ...)
+\method{sset}{tbl_df}(x, i = NULL, j = NULL, ...)
 
-\method{sset}{factor}(x, i, ...)
+\method{sset}{POSIXlt}(x, i = NULL, j = NULL, ...)
 
-\method{sset}{data.frame}(x, i, j, ...)
+\method{sset}{data.table}(x, i = NULL, j = NULL, ...)
 
-\method{sset}{tbl_df}(x, i, j, ...)
-
-\method{sset}{POSIXlt}(x, i, j, ...)
-
-\method{sset}{data.table}(x, i, j, ...)
-
-\method{sset}{sf}(x, i, j, ...)
+\method{sset}{sf}(x, i = NULL, j = NULL, ...)
 }
 \arguments{
 \item{x}{Vector or data frame.}
@@ -97,19 +88,4 @@ mark(df[df$x > 0, , drop = FALSE],
      sset(df, df$x > 0),
      check = FALSE) # Row names are different
 
-
-## EXTRA: An easy way to incorporate cheapr into dplyr's filter()
-# cheapr_filter <- function(.data, ..., .by = NULL, .preserve = FALSE){
-#   filter_df <- .data |>
-#     dplyr::mutate(..., .by = {{ .by }}, .keep = "none")
-#   groups <- dplyr::group_vars(filter_df)
-#   filter_df <- cheapr::sset(filter_df, j = setdiff(names(filter_df), groups))
-#   n_filters <- ncol(filter_df)
-#   if (n_filters < 1){
-#     .data
-#   } else {
-#     dplyr::dplyr_row_slice(.data, cheapr::which_(Reduce(`&`, filter_df)),
-#                            preserve = .preserve)
-#   }
-# }
 }
