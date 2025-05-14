@@ -1,8 +1,14 @@
-#ifndef cheapr_cpp_funs
-#define cheapr_cpp_funs
+#ifndef cheapr_h
+#define cheapr_h
 
 #include <cpp11.hpp>
 #include <Rinternals.h>
+
+#ifdef _MSC_VER
+#define RESTRICT __restrict
+#else
+#define RESTRICT __restrict__
+#endif
 
 #ifndef R_NO_REMAP
 #define R_NO_REMAP
@@ -12,7 +18,7 @@
 #define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
 #endif
 #ifndef INTEGER64_PTR
-#define INTEGER64_PTR(x) ((long long*) REAL(x))
+#define INTEGER64_PTR(x) ((int_fast64_t*) REAL(x))
 #endif
 
 #ifdef _OPENMP
@@ -36,35 +42,51 @@
 #define integer_max_ std::numeric_limits<int>::max()
 #endif
 
-#ifndef cheapr_is_na_int
-#define cheapr_is_na_int(x) ((bool) (x == NA_INTEGER))
-#endif
-
-#ifndef cheapr_is_na_str
-#define cheapr_is_na_str(x) ((bool) (x == NA_STRING))
-#endif
-
-#ifndef cheapr_is_na_cplx
-#define cheapr_is_na_cplx(x) ((bool) (x.r != x.r) || (x.i != x.i))
-#endif
-
-#ifndef cheapr_is_na_dbl
-#define cheapr_is_na_dbl(x) ((bool) (x != x))
+#ifndef integer64_max_
+#define integer64_max_ std::numeric_limits<int_fast64_t>::max()
 #endif
 
 #ifndef NA_INTEGER64
-#define NA_INTEGER64 LLONG_MIN
+#define NA_INTEGER64 std::numeric_limits<int_fast64_t>::min()
 #endif
 
-#ifndef cheapr_is_na_int64
-#define cheapr_is_na_int64(x) ((bool) (x == NA_INTEGER64))
+
+// is_na macro functions
+
+#ifndef is_na_lgl
+#define is_na_lgl(x) ((bool) (x == NA_LOGICAL))
 #endif
+
+#ifndef is_na_int
+#define is_na_int(x) ((bool) (x == NA_INTEGER))
+#endif
+
+#ifndef is_na_dbl
+#define is_na_dbl(x) ((bool) (x != x))
+#endif
+
+#ifndef is_na_str
+#define is_na_str(x) ((bool) (x == NA_STRING))
+#endif
+
+#ifndef is_na_cplx
+#define is_na_cplx(x) ((bool) (x.r != x.r) || (x.i != x.i))
+#endif
+
+#ifndef is_na_raw
+#define is_na_raw(x) ((bool) false)
+#endif
+
+#ifndef is_na_int64
+#define is_na_int64(x) ((bool) (x == NA_INTEGER64))
+#endif
+
 
 #ifndef CHEAPR_INT_TO_INT64
-#define CHEAPR_INT_TO_INT64(x) ((long long int) (x == NA_INTEGER ? NA_INTEGER64 : x))
+#define CHEAPR_INT_TO_INT64(x) ((int_fast64_t) (x == NA_INTEGER ? NA_INTEGER64 : x))
 #endif
 #ifndef CHEAPR_DBL_TO_INT64
-#define CHEAPR_DBL_TO_INT64(x) ((long long int) (x != x ? NA_INTEGER64 : x))
+#define CHEAPR_DBL_TO_INT64(x) ((int_fast64_t) (x != x ? NA_INTEGER64 : x))
 #endif
 #ifndef CHEAPR_INT64_TO_INT
 #define CHEAPR_INT64_TO_INT(x) ((int) (x == NA_INTEGER64 ? NA_INTEGER : x))
@@ -82,50 +104,27 @@
 #endif
 
 #ifndef CHEAPR_TYPEOF
-#define CHEAPR_TYPEOF(x)  ( (SEXPTYPE) (Rf_inherits(x, "integer64") ? CHEAPR_INT64SXP : TYPEOF(x)) )
+#define CHEAPR_TYPEOF(x) ( (SEXPTYPE) (Rf_inherits(x, "integer64") ? CHEAPR_INT64SXP : TYPEOF(x)) )
 #endif
 
-inline bool is_int64(SEXP x){
-  return Rf_isReal(x) && Rf_inherits(x, "integer64");
-}
+#ifndef SHIELD
+#define SHIELD(x) (Rf_protect(x))
+#endif
 
-inline bool is_df(SEXP x){
-  return Rf_inherits(x, "data.frame");
-}
-
-inline R_xlen_t r_length(SEXP x){
-  return Rf_asReal(cpp11::package("base")["length"](x));
-}
-
-inline cpp11::function base_match = cpp11::package("base")["match"];
-inline cpp11::function cheapr_sset = cpp11::package("cheapr")["sset"];
-inline cpp11::function cheapr_is_na = cpp11::package("cheapr")["is_na"];
-inline cpp11::function base_colon = cpp11::package("base")[":"];
-
-
-// Definition of simple atomic vector is one in which
-// it is both atomic and all attributes data-independent
-inline bool is_simple_atomic_vec(SEXP x){
-  return (
-      Rf_isVectorAtomic(x) && (
-          !Rf_isObject(x) || (
-              Rf_inherits(x, "Date") || Rf_inherits(x, "factor") ||
-              Rf_inherits(x, "POSIXct")
-          )
-      )
-  );
-}
+#ifndef YIELD
+#define YIELD(n) (Rf_unprotect(n))
+#endif
 
 int num_cores();
 SEXP cpp_which_(SEXP x, bool invert);
 SEXP cpp_missing_row(SEXP x, double threshold, bool threshold_is_prop);
 int int_div(int x, int y);
-R_xlen_t cpp_df_nrow(SEXP x);
 SEXP xlen_to_r(R_xlen_t x);
 R_xlen_t vec_length(SEXP x);
 SEXP r_address(SEXP x);
 R_xlen_t scalar_count(SEXP x, SEXP value, bool recursive);
 SEXP cpp_list_as_df(SEXP x);
+SEXP cpp_new_df(SEXP x, SEXP nrows, bool recycle, bool name_repair);
 SEXP cpp_is_na(SEXP x);
 SEXP cpp_which_na(SEXP x);
 SEXP cpp_which_not_na(SEXP x);
@@ -140,8 +139,6 @@ SEXP cpp_numeric_to_int64(SEXP x);
 SEXP cpp_int64_to_numeric(SEXP x);
 SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add);
 SEXP cpp_set_rm_attributes(SEXP x);
-void cpp_copy_names(SEXP source, SEXP target, bool deep_copy);
-void cpp_copy_attributes(SEXP source, SEXP target, bool deep_copy);
 SEXP coerce_vector(SEXP source, SEXPTYPE type);
 bool implicit_na_coercion(SEXP x, SEXP target);
 SEXP cpp_val_find(SEXP x, SEXP value, bool invert, SEXP n_values);
@@ -150,7 +147,166 @@ SEXP cpp_set_divide(SEXP x, SEXP y);
 SEXP cpp_val_remove(SEXP x, SEXP value);
 SEXP cpp_seq_len(R_xlen_t n);
 SEXP create_df_row_names(int n);
-SEXP shallow_copy(SEXP x);
+SEXP cpp_shallow_copy(SEXP x);
 SEXP exclude_locs(SEXP exclude, R_xlen_t xn);
+R_xlen_t unnested_length(SEXP x);
+SEXP cpp_drop_null(SEXP l, bool always_shallow_copy);
+SEXP cpp_lengths(SEXP x, bool names);
+SEXP sset_vec(SEXP x, SEXP indices, bool check);
+SEXP cpp_sset(SEXP x, SEXP indices, bool check);
+SEXP cpp_df_slice(SEXP x, SEXP indices, bool check);
+SEXP cpp_df_select(SEXP x, SEXP locs);
+SEXP cpp_df_subset(SEXP x, SEXP i, SEXP j, bool check);
+SEXP cpp_which_val(SEXP x, SEXP value, bool invert);
+SEXP cpp_sequence(SEXP size, SEXP from, SEXP by);
+SEXP cpp_rep_len(SEXP x, int length);
+SEXP cpp_rep(SEXP x, SEXP times);
+SEXP cpp_recycle(SEXP x, SEXP length);
+SEXP cpp_c(SEXP x);
+SEXP cpp_list_c(SEXP x);
+SEXP cpp_loc_set_replace(SEXP x, SEXP where, SEXP what);
+SEXP cpp_name_repair(SEXP names, SEXP dup_sep, SEXP empty_sep);
+SEXP cpp_unique(SEXP x, bool names);
+SEXP cpp_setdiff(SEXP x, SEXP y, bool unique);
+SEXP cpp_intersect(SEXP x, SEXP y, bool unique);
+SEXP get_ptype(SEXP x);
+SEXP get_list_element(SEXP list, SEXP str);
+SEXP list_c2(SEXP x, SEXP y);
+SEXP c2(SEXP x, SEXP y);
+SEXP reconstruct(SEXP x, SEXP source, bool shallow_copy);
+SEXP cpp_df_assign_cols(SEXP x, SEXP cols);
+SEXP cpp_df_col_c(SEXP x, bool recycle, bool name_repair);
+SEXP cpp_list_assign(SEXP x, SEXP values);
+SEXP slice_loc(SEXP x, R_xlen_t i);
+double cpp_sum(SEXP x);
+double cpp_min(SEXP x);
+SEXP cpp_str_coalesce(SEXP x);
+SEXP cpp_na_init(SEXP x, int n);
+SEXP new_list(R_xlen_t length, SEXP default_value);
+void set_list_as_df(SEXP x);
+SEXP cpp_semi_copy(SEXP x);
+
+inline const char* utf8_char(SEXP x){
+  return Rf_translateCharUTF8(x);
+}
+
+inline SEXP make_utf8_char(const char *x){
+  return Rf_mkCharCE(x, CE_UTF8);
+}
+
+inline SEXP make_utf8_str(const char *x){
+  return Rf_ScalarString(Rf_mkCharCE(x, CE_UTF8));
+}
+
+inline SEXP install_utf8(const char *x){
+  return Rf_installChar(Rf_mkCharCE(x, CE_UTF8));
+}
+
+inline bool is_null(SEXP x){
+  return x == R_NilValue;
+}
+
+inline SEXP new_vec(SEXPTYPE type, R_xlen_t n){
+  return Rf_allocVector(type, n);
+}
+
+inline SEXP coerce_vec(SEXP x, SEXPTYPE type){
+  return Rf_coerceVector(x, type);
+}
+
+inline bool is_int64(SEXP x){
+  return Rf_isReal(x) && Rf_inherits(x, "integer64");
+}
+
+inline bool is_df(SEXP x){
+  return Rf_inherits(x, "data.frame");
+}
+
+inline R_xlen_t r_length(SEXP x){
+  return Rf_asReal(cpp11::package("base")["length"](x));
+}
+
+inline int df_nrow(SEXP x){
+  return Rf_length(Rf_getAttrib(x, R_RowNamesSymbol));
+}
+
+// Definition of simple vector is one in which
+// - It is a vector or it is a list with no class
+// - Attributes are data-independent
+//
+// Care must be taken when combining different simple vectors
+// as attributes may only be applicable within a single vector
+// e.g. for factors (different levels) and POSIXct (different timezones)
+//
+
+inline bool is_simple_atomic_vec(SEXP x){
+  return (
+      Rf_isVectorAtomic(x) && (
+          !Rf_isObject(x) || (
+              Rf_inherits(x, "Date") || Rf_inherits(x, "factor") ||
+              Rf_inherits(x, "POSIXct")
+          )
+      )
+  );
+}
+
+inline bool is_bare_list(SEXP x){
+  return (!Rf_isObject(x) && TYPEOF(x) == VECSXP);
+}
+
+// Sometimes bare lists can be easily handled
+inline bool is_simple_vec(SEXP x){
+  return (is_simple_atomic_vec(x) || is_bare_list(x));
+}
+
+// Because Rf_ScalarLogical sometimes crashes R?.. Need to look into this
+inline SEXP scalar_lgl(bool x){
+  SEXP out = SHIELD(new_vec(LGLSXP, 1));
+  LOGICAL(out)[0] = x;
+  YIELD(1);
+  return out;
+}
+
+inline bool is_bare_df(SEXP x){
+  SEXP cls = Rf_getAttrib(x, R_ClassSymbol);
+  return Rf_length(cls) == 1 &&
+    std::strcmp(CHAR(STRING_ELT(cls, 0)), "data.frame") == 0;
+}
+
+inline bool is_bare_tbl(SEXP x){
+  SEXP xclass = Rf_getAttrib(x, R_ClassSymbol);
+  const SEXP *p_x = STRING_PTR_RO(xclass);
+
+  return Rf_length(xclass) == 3 &&
+    std::strcmp(CHAR(p_x[0]), "tbl_df") == 0 &&
+    std::strcmp(CHAR(p_x[1]), "tbl") == 0 &&
+    std::strcmp(CHAR(p_x[2]), "data.frame") == 0;
+}
+
+// Can't use `Rf_namesgets(x, R_NilValue)`
+// as it adds empty names instead of NULL
+inline void set_names(SEXP x, SEXP names){
+  names == R_NilValue ? Rf_setAttrib(x, R_NamesSymbol, R_NilValue) : Rf_namesgets(x, names);
+}
+inline SEXP get_names(SEXP x){
+  return Rf_getAttrib(x, R_NamesSymbol);
+}
+
+inline cpp11::function cheapr_sset = cpp11::package("cheapr")["sset"];
+inline cpp11::function base_sset = cpp11::package("base")["["];
+inline cpp11::function cheapr_is_na = cpp11::package("cheapr")["is_na"];
+inline cpp11::function cheapr_factor = cpp11::package("cheapr")["factor_"];
+inline cpp11::function base_colon = cpp11::package("base")[":"];
+inline cpp11::function base_rep = cpp11::package("base")["rep"];
+inline cpp11::function base_do_call = cpp11::package("base")["do.call"];
+inline cpp11::function base_as_character = cpp11::package("base")["as.character"];
+inline cpp11::function base_paste0 = cpp11::package("base")["paste0"];
+inline cpp11::function cheapr_fast_match = cpp11::package("cheapr")["fast_match"];
+inline cpp11::function cheapr_fast_unique = cpp11::package("cheapr")["fast_unique"];
+inline cpp11::function cheapr_reconstruct = cpp11::package("cheapr")["reconstruct"];
+
+inline bool address_equal(SEXP x, SEXP y){
+  return r_address(x) == r_address(y);
+}
 
 #endif

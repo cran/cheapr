@@ -6,6 +6,7 @@
 #'
 #' @param ... Objects to recycle.
 #' @param length Optional length to recycle objects to.
+#' @param .args An alternative to `...` for easier programming with lists.
 #'
 #' @returns
 #' A list of recycled R objects.
@@ -18,37 +19,23 @@
 #' @examples
 #' library(cheapr)
 #'
+#' # Recycles both to size 10
 #' recycle(Sys.Date(), 1:10)
 #'
 #' # Any vectors of zero-length are all recycled to zero-length
 #' recycle(integer(), 1:10)
 #'
-#' # Data frame rows are recycled
-#' recycle(sset(iris, 1:3), length = 3 * 3)
+#' # Unless length is supplied
+#' recycle(integer(), 1:10, length = 10)
 #'
-#' # To recycle list items, use `do.call()`
+#' # Data frame rows are recycled
+#' recycle(sset(iris, 1:3), length = 9)
+#'
+#' # To recycle objects in a list, use `.args`
 #' my_list <- list(from = 1L, to = 10L, by = seq(0.1, 1, 0.1))
-#' do.call(recycle, my_list)
+#' recycle(.args = my_list)
 #'
 #' @export
-recycle <- function (..., length = NULL){
-  out <- cpp_list_rm_null(list(...))
-  lens <- lengths_(out)
-  if (is.null(length)) {
-    if (length(lens)) {
-      N <- max(lens)
-    }
-    else {
-      N <- 0L
-    }
-  }
-  else {
-    N <- length
-  }
-  N <- N * (!collapse::anyv(lens, 0L))
-  recyclei <- which_(lens != N)
-  if (length(recyclei)){
-    out[recyclei] <- lapply(out[recyclei], cheapr_rep_len, N)
-  }
-  out
+recycle <- function (..., length = NULL, .args = NULL){
+  .Call(`_cheapr_cpp_recycle`, .Call(`_cheapr_cpp_list_args`, list(...), .args), length)
 }

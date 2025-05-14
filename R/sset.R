@@ -69,8 +69,8 @@ sset <- function(x, ...){
 }
 #' @export
 sset.default <- function(x, i, ...){
-  if (is_simple_atomic(x) && n_dots(...) == 0){
-    .Call(`_cheapr_cpp_sset`, x, if (missing(i)) seq_len(vector_length(x)) else i)
+  if (cpp_is_simple_vec(x) && n_dots(...) == 0){
+    .Call(`_cheapr_cpp_sset`, x, if (missing(i)) seq_len(vector_length(x)) else i, TRUE)
   } else {
     if (!missing(i) && is.logical(i)){
       check_length(i, length(x))
@@ -82,19 +82,11 @@ sset.default <- function(x, i, ...){
 #' @rdname sset
 #' @export
 sset.data.frame <- function(x, i = NULL, j = NULL, ...){
-  .Call(`_cheapr_cpp_df_subset`, x, i, j, FALSE)
-}
-#' @rdname sset
-#' @export
-sset.tbl_df <- function(x, i = NULL, j = NULL, ...){
-  out <- sset_df(x, i , j)
-  class(out) <- c("tbl_df", "tbl", "data.frame")
-  out
+  .Call(`_cheapr_cpp_df_subset`, x, i, j, TRUE)
 }
 #' @rdname sset
 #' @export
 sset.POSIXlt <- function(x, i = NULL, j = NULL, ...){
-  missingi <- is.null(i)
   missingj <- is.null(j)
   out <- fill_posixlt(x, classed = FALSE)
   if (missingj){
@@ -102,49 +94,25 @@ sset.POSIXlt <- function(x, i = NULL, j = NULL, ...){
   }
   out <- sset_df(list_as_df(out), i , j)
   if (missingj){
-    set_attr(out, "class", class(x))
-    set_rm_attr(out, "row.names")
+    attrs_add(out, class = class(x), row.names = NULL, .set = TRUE)
   }
-  set_attr(out, "tzone", attr(x, "tzone"))
+  attrs_add(out, tzone = attr(x, "tzone"), .set = TRUE)
   if (posixlt_is_balanced(x)){
-    set_attr(out, "balanced", TRUE)
+    attrs_add(out, balanced = TRUE, .set = TRUE)
   } else {
-    set_attr(out, "balanced", NA)
-  }
-  out
-}
-#' @rdname sset
-#' @export
-sset.data.table <- function(x, i = NULL, j = NULL, ...){
-  out <- sset_df(x, i , j)
-  set_attrs(out, list(
-    class = class(x),
-    .internal.selfref = attributes(x)[[".internal.selfref"]]
-  ), add = TRUE)
-  dt_alloc <- tryCatch(get("setalloccol",
-                           asNamespace("data.table"),
-                           inherits = FALSE),
-                       error = function(e) return(".r.error"))
-  # Reserve sufficient space as data.table::truelength(out) at this point is 0
-  if (is.character(dt_alloc) && length(dt_alloc) == 1 && dt_alloc == ".r.error"){
-    out <- collapse::qDT(out)
-  } else {
-    dt_alloc(out, n = getOption("datatable.alloccol", 1024L))
+    attrs_add(out, balanced = NA, .set = TRUE)
   }
   out
 }
 #' @rdname sset
 #' @export
 sset.sf <- function(x, i = NULL, j = NULL, ...){
-  out <- sset_df(x, i , j)
-  source_attrs <- attributes(x)
-  source_nms <- names(source_attrs)
-  attrs_to_keep <- source_attrs[setdiff_(source_nms, c("names", "row.names"))]
-  set_attrs(out, attrs_to_keep, add = TRUE)
+  out <- sset_df(x, i, j)
+  cpp_reconstruct(
+    out, x, c("names", "row.names"), vec_setdiff(names(attributes(x)), c("names", "row.names")), FALSE
+  )
 }
 #' @export
 sset.vctrs_rcrd <- function(x, i = NULL, ...){
-  out <- sset_row(list_as_df(x), i)
-  cpp_shallow_duplicate_attrs(x, out)
-  out
+  .Call(`_cheapr_cpp_set_add_attributes`, sset_row(list_as_df(x), i), attributes(x), FALSE)
 }

@@ -6,7 +6,7 @@
 \alias{sset_col}
 \title{Fast functions for data frame subsetting}
 \usage{
-sset_df(x, i = NULL, j = NULL, keep_attrs = FALSE)
+sset_df(x, i = NULL, j = NULL, ...)
 
 sset_row(x, i = NULL)
 
@@ -19,8 +19,7 @@ sset_col(x, j = NULL)
 
 \item{j}{Cols - If \code{NULL} all cols are returned.}
 
-\item{keep_attrs}{Should all attributes (except for \code{names} and \code{row.names})
-be kept as is? The default is \code{FALSE} which returns a plain data frame.}
+\item{...}{Unused.}
 }
 \value{
 A data frame subsetted on rows \code{i} and cols \code{j}.
@@ -33,4 +32,7 @@ filtering on rows and/or cols.
 If you are unsure which functions to use then it is recommended to use
 \code{sset()}. These low-overhead helpers do not work well with data.tables
 but should work well with basic data frames and basic tibbles.
+The only real difference between \code{sset_df} and \code{sset_row}/\code{sset_col} is that
+\code{sset_df} attempts to return a similar type of data frame as the input,
+whereas \code{sset_row} and \code{sset_col} always return a plain data frame.
 }

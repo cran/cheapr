@@ -399,171 +399,171 @@ test_that("lags and lead with set = TRUE", {
   }
 
   expect_identical(
-    set_lag(r_copy(a), 0), a
+    set_lag(deep_copy(a), 0), a
   )
   expect_identical(
-    set_lag(r_copy(a), 1), base_lag(a, 1)
+    set_lag(deep_copy(a), 1), base_lag(a, 1)
   )
   expect_identical(
-    set_lag(r_copy(a), -1), base_lag(a, -1)
+    set_lag(deep_copy(a), -1), base_lag(a, -1)
   )
   expect_identical(
-    set_lag(r_copy(a), 3), base_lag(a, 3)
+    set_lag(deep_copy(a), 3), base_lag(a, 3)
   )
   expect_identical(
-    set_lag(r_copy(a), -3), base_lag(a, -3)
+    set_lag(deep_copy(a), -3), base_lag(a, -3)
   )
   expect_identical(
-    set_lag(r_copy(a), 10^6), base_lag(a, 10^6)
+    set_lag(deep_copy(a), 10^6), base_lag(a, 10^6)
   )
   expect_identical(
-    set_lag(r_copy(a), -10^6), base_lag(a, -10^6)
-  )
-
-  expect_identical(
-    set_lag(r_copy(b), 0), b
-  )
-  expect_identical(
-    set_lag(r_copy(b), 1), base_lag(b, 1)
-  )
-  expect_identical(
-    set_lag(r_copy(b), -1), base_lag(b, -1)
-  )
-  expect_identical(
-    set_lag(r_copy(b), 3), base_lag(b, 3)
-  )
-  expect_identical(
-    set_lag(r_copy(b), -3), base_lag(b, -3)
-  )
-  expect_identical(
-    set_lag(r_copy(b), 10^6), base_lag(b, 10^6)
-  )
-  expect_identical(
-    set_lag(r_copy(b), -10^6), base_lag(b, -10^6)
+    set_lag(deep_copy(a), -10^6), base_lag(a, -10^6)
   )
 
-
   expect_identical(
-    set_lag(r_copy(c), 0), c
+    set_lag(deep_copy(b), 0), b
   )
   expect_identical(
-    set_lag(r_copy(c), 1), base_lag(c, 1)
+    set_lag(deep_copy(b), 1), base_lag(b, 1)
   )
   expect_identical(
-    set_lag(r_copy(c), -1), base_lag(c, -1)
+    set_lag(deep_copy(b), -1), base_lag(b, -1)
   )
   expect_identical(
-    set_lag(r_copy(c), 3), base_lag(c, 3)
+    set_lag(deep_copy(b), 3), base_lag(b, 3)
   )
   expect_identical(
-    set_lag(r_copy(c), -3), base_lag(c, -3)
+    set_lag(deep_copy(b), -3), base_lag(b, -3)
   )
   expect_identical(
-    set_lag(r_copy(c), 10^6), base_lag(c, 10^6)
+    set_lag(deep_copy(b), 10^6), base_lag(b, 10^6)
   )
   expect_identical(
-    set_lag(r_copy(c), -10^6), base_lag(c, -10^6)
+    set_lag(deep_copy(b), -10^6), base_lag(b, -10^6)
   )
 
 
   expect_identical(
-    set_lag(r_copy(d), 0), d
+    set_lag(deep_copy(c), 0), c
   )
   expect_identical(
-    set_lag(r_copy(d), 1), base_lag(d, 1)
+    set_lag(deep_copy(c), 1), base_lag(c, 1)
   )
   expect_identical(
-    set_lag(r_copy(d), -1), base_lag(d, -1)
+    set_lag(deep_copy(c), -1), base_lag(c, -1)
   )
   expect_identical(
-    set_lag(r_copy(d), 3), base_lag(d, 3)
+    set_lag(deep_copy(c), 3), base_lag(c, 3)
   )
   expect_identical(
-    set_lag(r_copy(d), -3), base_lag(d, -3)
+    set_lag(deep_copy(c), -3), base_lag(c, -3)
   )
   expect_identical(
-    set_lag(r_copy(d), 10^6), base_lag(d, 10^6)
+    set_lag(deep_copy(c), 10^6), base_lag(c, 10^6)
   )
   expect_identical(
-    set_lag(r_copy(d), -10^6), base_lag(d, -10^6)
+    set_lag(deep_copy(c), -10^6), base_lag(c, -10^6)
+  )
+
+
+  expect_identical(
+    set_lag(deep_copy(d), 0), d
+  )
+  expect_identical(
+    set_lag(deep_copy(d), 1), base_lag(d, 1)
+  )
+  expect_identical(
+    set_lag(deep_copy(d), -1), base_lag(d, -1)
+  )
+  expect_identical(
+    set_lag(deep_copy(d), 3), base_lag(d, 3)
+  )
+  expect_identical(
+    set_lag(deep_copy(d), -3), base_lag(d, -3)
+  )
+  expect_identical(
+    set_lag(deep_copy(d), 10^6), base_lag(d, 10^6)
+  )
+  expect_identical(
+    set_lag(deep_copy(d), -10^6), base_lag(d, -10^6)
   )
 
 
   expect_identical(
-    set_lag(r_copy(e), 0), e
+    set_lag(deep_copy(e), 0), e
   )
   expect_identical(
-    set_lag(r_copy(e), 1), base_lag(e, 1)
+    set_lag(deep_copy(e), 1), base_lag(e, 1)
   )
   expect_identical(
-    set_lag(r_copy(e), -1), base_lag(e, -1)
+    set_lag(deep_copy(e), -1), base_lag(e, -1)
   )
   expect_identical(
-    set_lag(r_copy(e), 3), base_lag(e, 3)
+    set_lag(deep_copy(e), 3), base_lag(e, 3)
   )
   expect_identical(
-    set_lag(r_copy(e), -3), base_lag(e, -3)
+    set_lag(deep_copy(e), -3), base_lag(e, -3)
   )
   expect_identical(
-    set_lag(r_copy(e), 10^6), base_lag(e, 10^6)
+    set_lag(deep_copy(e), 10^6), base_lag(e, 10^6)
   )
   expect_identical(
-    set_lag(r_copy(e), -10^6), base_lag(e, -10^6)
-  )
-
-  expect_identical(
-    set_lag(r_copy(f), 0), f
-  )
-  expect_identical(
-    set_lag(r_copy(f), 1, recursive = FALSE), base_lag(f, 1)
-  )
-  expect_identical(
-    set_lag(r_copy(f), -1, recursive = FALSE), base_lag(f, -1)
-  )
-  expect_identical(
-    set_lag(r_copy(f), 3, recursive = FALSE), base_lag(f, 3)
-  )
-  expect_identical(
-    set_lag(r_copy(f), -3, recursive = FALSE), base_lag(f, -3)
-  )
-  expect_identical(
-    set_lag(r_copy(f), 10^6, recursive = FALSE), base_lag(f, 10^6)
-  )
-  expect_identical(
-    set_lag(r_copy(f), -10^6, recursive = FALSE), base_lag(f, -10^6)
+    set_lag(deep_copy(e), -10^6), base_lag(e, -10^6)
   )
 
   expect_identical(
-    set_lag(r_copy(g), 0), g
+    set_lag(deep_copy(f), 0), f
   )
   expect_identical(
-    set_lag(r_copy(g), 1, recursive = FALSE), base_lag(g, 1)
+    set_lag(deep_copy(f), 1, recursive = FALSE), base_lag(f, 1)
   )
   expect_identical(
-    set_lag(r_copy(g), -1, recursive = FALSE), base_lag(g, -1)
+    set_lag(deep_copy(f), -1, recursive = FALSE), base_lag(f, -1)
   )
   expect_identical(
-    set_lag(r_copy(g), 3, recursive = FALSE), base_lag(g, 3)
+    set_lag(deep_copy(f), 3, recursive = FALSE), base_lag(f, 3)
   )
   expect_identical(
-    set_lag(r_copy(g), -3, recursive = FALSE), base_lag(g, -3)
+    set_lag(deep_copy(f), -3, recursive = FALSE), base_lag(f, -3)
   )
   expect_identical(
-    set_lag(r_copy(g), 10^6, recursive = FALSE), base_lag(g, 10^6)
+    set_lag(deep_copy(f), 10^6, recursive = FALSE), base_lag(f, 10^6)
   )
   expect_identical(
-    set_lag(r_copy(g), -10^6, recursive = FALSE), base_lag(g, -10^6)
+    set_lag(deep_copy(f), -10^6, recursive = FALSE), base_lag(f, -10^6)
   )
 
   expect_identical(
-    set_lag(r_copy(iris), 7),
+    set_lag(deep_copy(g), 0), g
+  )
+  expect_identical(
+    set_lag(deep_copy(g), 1, recursive = FALSE), base_lag(g, 1)
+  )
+  expect_identical(
+    set_lag(deep_copy(g), -1, recursive = FALSE), base_lag(g, -1)
+  )
+  expect_identical(
+    set_lag(deep_copy(g), 3, recursive = FALSE), base_lag(g, 3)
+  )
+  expect_identical(
+    set_lag(deep_copy(g), -3, recursive = FALSE), base_lag(g, -3)
+  )
+  expect_identical(
+    set_lag(deep_copy(g), 10^6, recursive = FALSE), base_lag(g, 10^6)
+  )
+  expect_identical(
+    set_lag(deep_copy(g), -10^6, recursive = FALSE), base_lag(g, -10^6)
+  )
+
+  expect_identical(
+    set_lag(deep_copy(iris), 7),
     as.data.frame(lapply(iris, base_lag, 7)),
   )
 })
 
 test_that("Dynamic lags by-group", {
   set.seed(1239)
-  df <- data.frame(x = sample.int(5, 20, TRUE),
+  df <- data.frame(x = sample.int(10, 20, TRUE),
                    g = sample.int(3, 20, TRUE),
                    lags = sample(c(0, 1, 2), 20, TRUE))
 
@@ -583,6 +583,30 @@ test_that("Dynamic lags by-group", {
 res2 <- lag2_(df$x, order = o, run_lengths = rls, n = df$lags)
 
 expect_identical(res, res2)
+})
+
+test_that("Dynamic recycled lags by-group", {
+  set.seed(1239)
+  df <- data.frame(x = sample.int(10, 20, TRUE),
+                   g = sample.int(3, 20, TRUE),
+                   lags = rep_len(c(1, -1), 20))
+
+  o <- order(df$g)
+  rls <- as.integer(table(df$g))
+
+  # Somewhat ugly by-group calculation
+  # order(order(x)) will return sort(x) back to its original order
+  res <- unname(
+    do.call(
+      c,
+      lapply(split(df, df$g),
+             function(x) base_lag(x$x, x$lags))
+    )
+  )[order(o)]
+
+  res2 <- lag2_(df$x, order = o, run_lengths = rls, n = c(1, -1))
+
+  expect_identical(res, res2)
 })
 
 test_that("oob lag", {

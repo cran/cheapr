@@ -1,3 +1,60 @@
+# cheapr 1.2.0
+
+This version of cheapr sees many speed improvements and new features.
+
+### New functions
+
+- `list_as_df` for fast converting lists into data frames.
+
+- `attrs_add` and `attrs_rm` to allow for adding and removing attributes, 
+both normally and in-place.
+
+- `shallow_copy`, `semi_copy` and `deep_copy` for shallow 
+and full copies of R objects.
+
+- `address` to retrieve the memory address of an R object.
+
+- `cheapr_rep`, `cheapr_rep_len` and `cheapr_rep_each` to repeat out vectors 
+efficiently.
+
+- `cheapr_c` to concatenate vectors and data frame rows together fast and safely.
+
+- `reconstruct` as a method to allow users to write methods to restore objects
+using a template. Currently only data frames are being reconstructed.
+
+- `col_c` as a way to combine data frames cols and vectors into a data frame.
+
+- `list_combine` as a way to combine elements from 
+multiple lists into a single list.
+
+- `list_assign` for fast assigning multiple elements to a list.
+
+- `list_drop_null` to quickly drop `NULL` elements.
+
+- More exported C functions.
+
+### Changes
+
+- `new_df` has been mostly re-written in C and now recycles and 
+repairs names by default. It also doesn't deparse expressions into strings
+where names don't exist and now simply replaces those object names with 
+`col_i` where i is the ith column containing that object.
+
+### New features
+
+- `.args` has been added in many places as an alternative to the dots argument
+`...` 
+It allows you to supply a list of objects instead of supplying them in the 
+usual way. This can be useful when you already have a list and want to pass them
+as arguments very efficiently. For example, `cheapr_c(.args = list(x, y))` is 
+equivalent to `do.call(cheapr_c, list(x, y))` and `cheapr_c(x, y)`.
+
+
+### Deprecations
+
+- The `keep_attrs` arg of `sset_df` has been removed. Use the internal 
+`cpp_reconstruct` or a custom solution to keep all attributes of `x`.
+
 # cheapr 1.1.0
 
 - Fixed CRAN notes on deprecated C functions.

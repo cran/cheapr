@@ -3,12 +3,6 @@
 // NA handling functions
 // Author: Nick Christofides
 
-
-#define CHEAPR_COUNT_NA(_ISNA_)                                \
-for (R_xlen_t i = 0; i < n; ++i){                              \
-  count += _ISNA_(p_x[i]);                                     \
-}                                                              \
-
 #define CHEAPR_ANY_NA(_ISNA_)                                  \
 for (R_xlen_t i = 0; i < n; ++i){                              \
   if (_ISNA_(p_x[i])){                                         \
@@ -25,11 +19,6 @@ for (R_xlen_t i = 0; i < n; ++i){                              \
   }                                                            \
 }                                                              \
 
-#define CHEAPR_VEC_IS_NA(_ISNA_)                               \
-for (R_xlen_t i = 0; i < n; ++i){                              \
-  p_out[i] = _ISNA_(p_x[i]);                                   \
-}                                                              \
-
 
 R_xlen_t na_count(SEXP x, bool recursive){
   R_xlen_t n = Rf_xlength(x);
@@ -43,35 +32,35 @@ R_xlen_t na_count(SEXP x, bool recursive){
   }
   case LGLSXP:
   case INTSXP: {
-    int *p_x = INTEGER(x);
+    const int *p_x = INTEGER(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
-      CHEAPR_COUNT_NA(cheapr_is_na_int);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_int(p_x[i]);
     } else {
       OMP_FOR_SIMD
-      CHEAPR_COUNT_NA(cheapr_is_na_int);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_int(p_x[i]);
     }
     break;
   }
   case CHEAPR_INT64SXP: {
-    long long *p_x = INTEGER64_PTR(x);
+    const int_fast64_t *p_x = INTEGER64_PTR(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
-      CHEAPR_COUNT_NA(cheapr_is_na_int64);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_int64(p_x[i]);
     } else {
       OMP_FOR_SIMD
-      CHEAPR_COUNT_NA(cheapr_is_na_int64);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_int64(p_x[i]);
     }
     break;
   }
   case REALSXP: {
-    double *p_x = REAL(x);
+    const double *p_x = REAL(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
-      CHEAPR_COUNT_NA(cheapr_is_na_dbl);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_dbl(p_x[i]);
     } else {
       OMP_FOR_SIMD
-      CHEAPR_COUNT_NA(cheapr_is_na_dbl);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_dbl(p_x[i]);
     }
     break;
   }
@@ -79,10 +68,9 @@ R_xlen_t na_count(SEXP x, bool recursive){
     const SEXP *p_x = STRING_PTR_RO(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
-      CHEAPR_COUNT_NA(cheapr_is_na_str);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_str(p_x[i]);
     } else {
-      OMP_FOR_SIMD
-      CHEAPR_COUNT_NA(cheapr_is_na_str);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_str(p_x[i]);
     }
     break;
   }
@@ -90,13 +78,13 @@ R_xlen_t na_count(SEXP x, bool recursive){
     break;
   }
   case CPLXSXP: {
-    Rcomplex *p_x = COMPLEX(x);
+    const Rcomplex *p_x = COMPLEX(x);
     if (do_parallel){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
-      CHEAPR_COUNT_NA(cheapr_is_na_cplx);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_cplx(p_x[i]);
     } else {
       OMP_FOR_SIMD
-      CHEAPR_COUNT_NA(cheapr_is_na_cplx);
+      for (R_xlen_t i = 0; i < n; ++i) count += is_na_cplx(p_x[i]);
     }
     break;
   }
@@ -112,13 +100,13 @@ R_xlen_t na_count(SEXP x, bool recursive){
   }
   }
   default: {
-    SEXP is_missing = Rf_protect(cheapr_is_na(x)); ++NP;
-    SEXP r_true = Rf_protect(Rf_ScalarLogical(true)); ++NP;
+    SEXP is_missing = SHIELD(cheapr_is_na(x)); ++NP;
+    SEXP r_true = SHIELD(scalar_lgl(true)); ++NP;
     count = scalar_count(is_missing, r_true, true);
     break;
   }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return count;
 }
 
@@ -140,22 +128,22 @@ bool cpp_any_na(SEXP x, bool recursive){
   case LGLSXP:
   case INTSXP: {
     int *p_x = INTEGER(x);
-    CHEAPR_ANY_NA(cheapr_is_na_int);
+    CHEAPR_ANY_NA(is_na_int);
     break;
   }
   case CHEAPR_INT64SXP: {
-    long long *p_x = INTEGER64_PTR(x);
-    CHEAPR_ANY_NA(cheapr_is_na_int64);
+    int_fast64_t *p_x = INTEGER64_PTR(x);
+    CHEAPR_ANY_NA(is_na_int64);
     break;
   }
   case REALSXP: {
     double *p_x = REAL(x);
-    CHEAPR_ANY_NA(cheapr_is_na_dbl);
+    CHEAPR_ANY_NA(is_na_dbl);
     break;
   }
   case STRSXP: {
     const SEXP *p_x = STRING_PTR_RO(x);
-    CHEAPR_ANY_NA(cheapr_is_na_str);
+    CHEAPR_ANY_NA(is_na_str);
     break;
   }
   case RAWSXP: {
@@ -163,7 +151,7 @@ bool cpp_any_na(SEXP x, bool recursive){
   }
   case CPLXSXP: {
     Rcomplex *p_x = COMPLEX(x);
-    CHEAPR_ANY_NA(cheapr_is_na_cplx);
+    CHEAPR_ANY_NA(is_na_cplx);
     break;
   }
   case VECSXP: {
@@ -176,13 +164,13 @@ bool cpp_any_na(SEXP x, bool recursive){
   }
   }
   default: {
-    SEXP is_missing = Rf_protect(cheapr_is_na(x)); ++NP;
-    SEXP any_missing = Rf_protect(cpp11::package("base")["any"](is_missing)); ++NP;
+    SEXP is_missing = SHIELD(cheapr_is_na(x)); ++NP;
+    SEXP any_missing = SHIELD(cpp11::package("base")["any"](is_missing)); ++NP;
     out = Rf_asLogical(any_missing);
     break;
   }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -202,22 +190,22 @@ bool cpp_all_na(SEXP x, bool return_true_on_empty, bool recursive){
   case LGLSXP:
   case INTSXP: {
     int *p_x = INTEGER(x);
-    CHEAPR_ALL_NA(cheapr_is_na_int);
+    CHEAPR_ALL_NA(is_na_int);
     break;
   }
   case CHEAPR_INT64SXP: {
-    long long *p_x = INTEGER64_PTR(x);
-    CHEAPR_ALL_NA(cheapr_is_na_int64);
+    int_fast64_t *p_x = INTEGER64_PTR(x);
+    CHEAPR_ALL_NA(is_na_int64);
     break;
   }
   case REALSXP: {
     double *p_x = REAL(x);
-    CHEAPR_ALL_NA(cheapr_is_na_dbl);
+    CHEAPR_ALL_NA(is_na_dbl);
     break;
   }
   case STRSXP: {
     const SEXP *p_x = STRING_PTR_RO(x);
-    CHEAPR_ALL_NA(cheapr_is_na_str);
+    CHEAPR_ALL_NA(is_na_str);
     break;
   }
   case RAWSXP: {
@@ -225,7 +213,7 @@ bool cpp_all_na(SEXP x, bool return_true_on_empty, bool recursive){
   }
   case CPLXSXP: {
     Rcomplex *p_x = COMPLEX(x);
-    CHEAPR_ALL_NA(cheapr_is_na_cplx);
+    CHEAPR_ALL_NA(is_na_cplx);
     break;
   }
   case VECSXP: {
@@ -238,13 +226,13 @@ bool cpp_all_na(SEXP x, bool return_true_on_empty, bool recursive){
   }
   }
   default: {
-    SEXP is_missing = Rf_protect(cheapr_is_na(x)); ++NP;
-    SEXP all_missing = Rf_protect(cpp11::package("base")["all"](is_missing)); ++NP;
+    SEXP is_missing = SHIELD(cheapr_is_na(x)); ++NP;
+    SEXP all_missing = SHIELD(cpp11::package("base")["all"](is_missing)); ++NP;
     out = Rf_asLogical(all_missing);
     break;
   }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -259,86 +247,91 @@ SEXP cpp_is_na(SEXP x){
   SEXP out;
   switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, 0));
+    out = SHIELD(new_vec(LGLSXP, 0));
     break;
   }
   case LGLSXP:
   case INTSXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
-    int *p_x = INTEGER(x);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
+    const int *p_x = INTEGER(x);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_int);
+      for (R_xlen_t i = 0; i < n; ++i){
+        p_out[i] = is_na_int(p_x[i]);
+      }
     } else {
       OMP_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_int);
+      for (R_xlen_t i = 0; i < n; ++i){
+        p_out[i] = is_na_int(p_x[i]);
+      }
     }
 
     break;
   }
   case CHEAPR_INT64SXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
-    long long *p_x = INTEGER64_PTR(x);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
+    const int_fast64_t *p_x = INTEGER64_PTR(x);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_int64);
+      for (R_xlen_t i = 0; i < n; ++i){
+        p_out[i] = is_na_int64(p_x[i]);
+      }
     } else {
       OMP_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_int64);
+      for (R_xlen_t i = 0; i < n; ++i){
+        p_out[i] = is_na_int64(p_x[i]);
+      }
     }
     break;
   }
   case REALSXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
-    double *p_x = REAL(x);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
+    const double *p_x = REAL(x);
     if (n_cores > 1){
       OMP_PARALLEL_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_dbl);
+      for (R_xlen_t i = 0; i < n; ++i){
+        p_out[i] = is_na_dbl(p_x[i]);
+      }
     } else {
       OMP_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_dbl);
+      for (R_xlen_t i = 0; i < n; ++i){
+        p_out[i] = is_na_dbl(p_x[i]);
+      }
     }
     break;
   }
   case STRSXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
     const SEXP *p_x = STRING_PTR_RO(x);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_str);
-    } else {
-      OMP_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_str);
+    for (R_xlen_t i = 0; i < n; ++i){
+      p_out[i] = is_na_str(p_x[i]);
     }
     break;
   }
   case RAWSXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
     memset(p_out, 0, n * sizeof(int));
     break;
   }
   case CPLXSXP: {
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
-    Rcomplex *p_x = COMPLEX(x);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_cplx);
-    } else {
-      OMP_FOR_SIMD
-      CHEAPR_VEC_IS_NA(cheapr_is_na_cplx);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
+    const Rcomplex *p_x = COMPLEX(x);
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i){
+      p_out[i] = is_na_cplx(p_x[i]);
     }
     break;
   }
   case VECSXP: {
     if (!Rf_isObject(x)){
-    out = Rf_protect(Rf_allocVector(LGLSXP, n));
-    int *p_out = LOGICAL(out);
+    out = SHIELD(new_vec(LGLSXP, n));
+    int* RESTRICT p_out = LOGICAL(out);
     const SEXP *p_x = VECTOR_PTR_RO(x);
     for (R_xlen_t i = 0; i < n; ++i){
       p_out[i] = cpp_all_na(p_x[i], false, true);
@@ -347,11 +340,11 @@ SEXP cpp_is_na(SEXP x){
   }
   }
   default: {
-    out = Rf_protect(cpp11::package("base")["is.na"](x));
+    out = SHIELD(cpp11::package("base")["is.na"](x));
     break;
   }
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 
@@ -363,8 +356,8 @@ SEXP cpp_df_row_na_counts(SEXP x){
   const SEXP *p_x = VECTOR_PTR_RO(x);
   int num_col = Rf_length(x);
   int NP = 0;
-  R_xlen_t num_row = cpp_df_nrow(x);
-  SEXP out = Rf_protect(Rf_allocVector(INTSXP, num_row)); ++NP;
+  int num_row = df_nrow(x);
+  SEXP out = SHIELD(new_vec(INTSXP, num_row)); ++NP;
   int *p_out = INTEGER(out);
   memset(p_out, 0, num_row * sizeof(int));
   int n_cores = num_row >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
@@ -376,25 +369,25 @@ SEXP cpp_df_row_na_counts(SEXP x){
       int *p_xj = INTEGER(p_x[j]);
 #pragma omp parallel num_threads(n_cores) if(do_parallel)
 #pragma omp for simd
-      for (R_xlen_t i = 0; i < num_row; ++i){
-        p_out[i] += cheapr_is_na_int(p_xj[i]);
+      for (int i = 0; i < num_row; ++i){
+        p_out[i] += is_na_int(p_xj[i]);
       }
       break;
     }
     case REALSXP: {
       if (is_int64(p_x[j])){
-      long long *p_xj = (long long *) REAL(p_x[j]);
+      int_fast64_t *p_xj = (int_fast64_t *) REAL(p_x[j]);
 #pragma omp parallel num_threads(n_cores) if(do_parallel)
 #pragma omp for simd
-      for (R_xlen_t i = 0; i < num_row; ++i){
-        p_out[i] += cheapr_is_na_int64(p_xj[i]);
+      for (int i = 0; i < num_row; ++i){
+        p_out[i] += is_na_int64(p_xj[i]);
       }
     } else {
       double *p_xj = REAL(p_x[j]);
 #pragma omp parallel num_threads(n_cores) if(do_parallel)
 #pragma omp for simd
-      for (R_xlen_t i = 0; i < num_row; ++i){
-        p_out[i] += cheapr_is_na_dbl(p_xj[i]);
+      for (int i = 0; i < num_row; ++i){
+        p_out[i] += is_na_dbl(p_xj[i]);
       }
     }
       break;
@@ -403,8 +396,8 @@ SEXP cpp_df_row_na_counts(SEXP x){
       const SEXP *p_xj = STRING_PTR_RO(p_x[j]);
 #pragma omp parallel num_threads(n_cores) if(do_parallel)
 #pragma omp for simd
-      for (R_xlen_t i = 0; i < num_row; ++i){
-        p_out[i] += cheapr_is_na_str(p_xj[i]);
+      for (int i = 0; i < num_row; ++i){
+        p_out[i] += is_na_str(p_xj[i]);
       }
       break;
     }
@@ -415,41 +408,41 @@ SEXP cpp_df_row_na_counts(SEXP x){
       Rcomplex *p_xj = COMPLEX(p_x[j]);
 #pragma omp parallel num_threads(n_cores) if(do_parallel)
 #pragma omp for simd
-      for (R_xlen_t i = 0; i < num_row; ++i){
-        p_out[i] += cheapr_is_na_cplx(p_xj[i]);
+      for (int i = 0; i < num_row; ++i){
+        p_out[i] += is_na_cplx(p_xj[i]);
       }
       break;
     }
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j])); ++NP;
-      if (Rf_xlength(is_missing) != num_row){
+      SEXP is_missing = SHIELD(cheapr_is_na(p_x[j])); ++NP;
+      if (Rf_length(is_missing) != num_row){
         int int_nrows = num_row;
-        int element_length = Rf_xlength(is_missing); ++NP;
-        SEXP names = Rf_protect(Rf_getAttrib(x, R_NamesSymbol));
-        Rf_unprotect(NP);
+        int element_length = Rf_length(is_missing); ++NP;
+        SEXP names = SHIELD(get_names(x));
+        YIELD(NP);
         Rf_error("is.na method for list variable %s produces a length (%d) vector which does not equal the number of rows (%d)",
-                 CHAR(STRING_ELT(names, j)), element_length, int_nrows);
+                 utf8_char(STRING_ELT(names, j)), element_length, int_nrows);
       }
       int *p_is_missing = LOGICAL(is_missing);
-      for (R_xlen_t k = 0; k < num_row; ++k){
+      for (int k = 0; k < num_row; ++k){
         p_out[k] += p_is_missing[k];
       }
     } else {
       const SEXP *p_xj = VECTOR_PTR_RO(p_x[j]);
-      for (R_xlen_t i = 0; i < num_row; ++i){
+      for (int i = 0; i < num_row; ++i){
         p_out[i] += cpp_all_na(p_xj[i], false, true);
       }
     }
     break;
     }
     default: {
-      Rf_unprotect(NP);
+      YIELD(NP);
       Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(p_x[j])));
     }
     }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -461,30 +454,30 @@ SEXP cpp_df_col_na_counts(SEXP x){
   const SEXP *p_x = VECTOR_PTR_RO(x);
   int num_col = Rf_length(x);
   int NP = 0;
-  R_xlen_t num_row = cpp_df_nrow(x);
-  SEXP out = Rf_protect(Rf_allocVector(INTSXP, num_col)); ++NP;
+  int num_row = df_nrow(x);
+  SEXP out = SHIELD(new_vec(INTSXP, num_col)); ++NP;
   int *p_out = INTEGER(out);
   memset(p_out, 0, num_col * sizeof(int));
   for (int j = 0; j < num_col; ++j){
     switch ( TYPEOF(p_x[j]) ){
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j]));
+      SEXP is_missing = SHIELD(cheapr_is_na(p_x[j]));
       ++NP;
-      if (Rf_xlength(is_missing) != num_row){
+      if (Rf_length(is_missing) != num_row){
         int int_nrows = num_row;
-        int element_length = Rf_xlength(is_missing); ++NP;
-        SEXP names = Rf_protect(Rf_getAttrib(x, R_NamesSymbol));
-        Rf_unprotect(NP);
+        int element_length = Rf_length(is_missing); ++NP;
+        SEXP names = SHIELD(get_names(x));
+        YIELD(NP);
         Rf_error("is.na method for list variable %s produces a length (%d) vector which does not equal the number of rows (%d)",
-                 CHAR(STRING_ELT(names, j)), element_length, int_nrows);
+                 utf8_char(STRING_ELT(names, j)), element_length, int_nrows);
       }
       int *p_is_missing = LOGICAL(is_missing);
-      for (R_xlen_t k = 0; k < num_row; ++k){
+      for (int k = 0; k < num_row; ++k){
         p_out[j] += p_is_missing[k];
       }
     } else {
-      for (R_xlen_t i = 0; i < num_row; ++i){
+      for (int i = 0; i < num_row; ++i){
         p_out[j] += cpp_all_na(VECTOR_ELT(p_x[j], i), false, true);
       }
     }
@@ -496,7 +489,7 @@ SEXP cpp_df_col_na_counts(SEXP x){
     }
     }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -508,28 +501,28 @@ SEXP cpp_col_any_na(SEXP x, bool names){
   const SEXP *p_x = VECTOR_PTR_RO(x);
 
   int NP = 0;
-  int num_row = cpp_df_nrow(x);
+  int num_row = df_nrow(x);
   int num_col = Rf_length(x);
 
-  SEXP out = Rf_protect(Rf_allocVector(LGLSXP, num_col)); ++NP;
+  SEXP out = SHIELD(new_vec(LGLSXP, num_col)); ++NP;
   int *p_out = INTEGER(out);
 
   for (int j = 0; j < num_col; ++j){
     switch ( TYPEOF(p_x[j]) ){
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j]));
+      SEXP is_missing = SHIELD(cheapr_is_na(p_x[j]));
       cpp11::function r_any = cpp11::package("base")["any"];
       ++NP;
       if (Rf_xlength(is_missing) != num_row){
         int int_nrows = num_row;
         int element_length = Rf_xlength(is_missing); ++NP;
-        SEXP names = Rf_protect(Rf_getAttrib(x, R_NamesSymbol));
-        Rf_unprotect(NP);
+        SEXP names = SHIELD(get_names(x));
+        YIELD(NP);
         Rf_error("is.na method for list variable %s produces a length (%d) vector which does not equal the number of rows (%d)",
-                 CHAR(STRING_ELT(names, j)), element_length, int_nrows);
+                 utf8_char(STRING_ELT(names, j)), element_length, int_nrows);
       }
-      SEXP r_any_true = Rf_protect(r_any(is_missing)); ++NP;
+      SEXP r_any_true = SHIELD(r_any(is_missing)); ++NP;
       p_out[j] = Rf_asLogical(r_any_true);
     } else {
       bool any_na = false;
@@ -552,8 +545,10 @@ SEXP cpp_col_any_na(SEXP x, bool names){
     }
     }
   }
-  if (names) cpp_copy_names(x, out, false);
-  Rf_unprotect(NP);
+  if (names){
+    set_names(out, get_names(x));
+  }
+  YIELD(NP);
   return out;
 }
 
@@ -565,28 +560,28 @@ SEXP cpp_col_all_na(SEXP x, bool names){
   const SEXP *p_x = VECTOR_PTR_RO(x);
 
   int NP = 0;
-  int num_row = cpp_df_nrow(x);
+  int num_row = df_nrow(x);
   int num_col = Rf_length(x);
 
-  SEXP out = Rf_protect(Rf_allocVector(LGLSXP, num_col)); ++NP;
+  SEXP out = SHIELD(new_vec(LGLSXP, num_col)); ++NP;
   int *p_out = INTEGER(out);
 
   for (int j = 0; j < num_col; ++j){
     switch ( TYPEOF(p_x[j]) ){
     case VECSXP: {
       if (Rf_isObject(p_x[j])){
-      SEXP is_missing = Rf_protect(cheapr_is_na(p_x[j]));
+      SEXP is_missing = SHIELD(cheapr_is_na(p_x[j]));
       cpp11::function r_all = cpp11::package("base")["all"];
       ++NP;
       if (Rf_xlength(is_missing) != num_row){
         int int_nrows = num_row;
         int element_length = Rf_xlength(is_missing); ++NP;
-        SEXP names = Rf_protect(Rf_getAttrib(x, R_NamesSymbol));
-        Rf_unprotect(NP);
+        SEXP names = SHIELD(get_names(x));
+        YIELD(NP);
         Rf_error("is.na method for list variable %s produces a length (%d) vector which does not equal the number of rows (%d)",
-                 CHAR(STRING_ELT(names, j)), element_length, int_nrows);
+                 utf8_char(STRING_ELT(names, j)), element_length, int_nrows);
       }
-      SEXP r_all_true = Rf_protect(r_all(is_missing)); ++NP;
+      SEXP r_all_true = SHIELD(r_all(is_missing)); ++NP;
       p_out[j] = Rf_asLogical(r_all_true);
     } else {
       bool all_na2 = true;
@@ -609,8 +604,10 @@ SEXP cpp_col_all_na(SEXP x, bool names){
     }
     }
   }
-  if (names) cpp_copy_names(x, out, false);
-  Rf_unprotect(NP);
+  if (names){
+    set_names(out, get_names(x));
+  }
+  YIELD(NP);
   return out;
 }
 
@@ -624,10 +621,10 @@ SEXP cpp_col_all_na(SEXP x, bool names){
 //   const SEXP *p_x = VECTOR_PTR_RO(x);
 //
 //   int NP = 0;
-//   int num_row = cpp_df_nrow(x);
+//   int num_row = df_nrow(x);
 //   int num_col = Rf_length(x);
 //
-//   SEXP out = Rf_protect(Rf_allocVector(LGLSXP, num_row)); ++NP;
+//   SEXP out = SHIELD(new_vec(LGLSXP, num_row)); ++NP;
 //   int *p_out = INTEGER(out);
 //
 //   bool row_has_na = false;
@@ -638,7 +635,7 @@ SEXP cpp_col_all_na(SEXP x, bool names){
 //       switch ( TYPEOF(p_x[j]) ){
 //       case LGLSXP:
 //       case INTSXP: {
-//         if (cheapr_is_na_int(INTEGER(p_x[j])[i])){
+//         if (is_na_int(INTEGER(p_x[j])[i])){
 //         row_has_na = true;
 //         break;
 //       }
@@ -646,13 +643,13 @@ SEXP cpp_col_all_na(SEXP x, bool names){
 //       }
 //       case REALSXP: {
 //         if (is_int64(p_x[j])){
-//         long long *p_xj = (long long *) REAL(p_x[j]);
-//         if (cheapr_is_na_int64(p_xj[i])){
+//         int_fast64_t *p_xj = (int_fast64_t *) REAL(p_x[j]);
+//         if (is_na_int64(p_xj[i])){
 //           row_has_na = true;
 //           break;
 //         }
 //       } else {
-//         if (cheapr_is_na_dbl(REAL(p_x[j])[i])){
+//         if (is_na_dbl(REAL(p_x[j])[i])){
 //           row_has_na = true;
 //           break;
 //         }
@@ -660,14 +657,14 @@ SEXP cpp_col_all_na(SEXP x, bool names){
 //         break;
 //       }
 //       case STRSXP: {
-//         if (cheapr_is_na_str(STRING_PTR_RO(p_x[j])[i])){
+//         if (is_na_str(STRING_PTR_RO(p_x[j])[i])){
 //         row_has_na = true;
 //         break;
 //       }
 //         break;
 //       }
 //       default: {
-//         Rf_unprotect(NP);
+//         YIELD(NP);
 //         Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(p_x[j])));
 //       }
 //       }
@@ -675,7 +672,7 @@ SEXP cpp_col_all_na(SEXP x, bool names){
 //     p_out[i] = row_has_na;
 //   }
 //   if (names) cpp_copy_names(x, out, true);
-//   Rf_unprotect(NP);
+//   YIELD(NP);
 //   return out;
 // }
 
@@ -714,7 +711,7 @@ SEXP cpp_matrix_row_na_counts(SEXP x){
   R_xlen_t num_row = Rf_nrows(x);
   R_xlen_t num_col = Rf_ncols(x);
   R_xlen_t n = Rf_xlength(x);
-  SEXP out = Rf_protect(Rf_allocVector(INTSXP, num_row));
+  SEXP out = SHIELD(new_vec(INTSXP, num_row));
   int *p_out = INTEGER(out);
   memset(p_out, 0, num_row * sizeof(int));
   if (num_row > 0 && num_col > 0){
@@ -724,7 +721,7 @@ SEXP cpp_matrix_row_na_counts(SEXP x){
       int *p_x = INTEGER(x);
       for (R_xlen_t i = 0, rowi = 0; i < n; ++rowi, ++i){
         if (rowi == num_row) rowi = 0;
-        p_out[rowi] += cheapr_is_na_int(p_x[i]);
+        p_out[rowi] += is_na_int(p_x[i]);
       }
       break;
     }
@@ -732,15 +729,15 @@ SEXP cpp_matrix_row_na_counts(SEXP x){
       double *p_x = REAL(x);
       for (R_xlen_t i = 0, rowi = 0; i < n; ++rowi, ++i){
         if (rowi == num_row) rowi = 0;
-        p_out[rowi] += cheapr_is_na_dbl(p_x[i]);
+        p_out[rowi] += is_na_dbl(p_x[i]);
       }
       break;
     }
     case CHEAPR_INT64SXP: {
-      long long *p_x = INTEGER64_PTR(x);
+      int_fast64_t *p_x = INTEGER64_PTR(x);
       for (R_xlen_t i = 0, rowi = 0; i < n; ++rowi, ++i){
         if (rowi == num_row) rowi = 0;
-        p_out[rowi] += cheapr_is_na_int64(p_x[i]);
+        p_out[rowi] += is_na_int64(p_x[i]);
       }
       break;
     }
@@ -748,7 +745,7 @@ SEXP cpp_matrix_row_na_counts(SEXP x){
       const SEXP *p_x = STRING_PTR_RO(x);
       for (R_xlen_t i = 0, rowi = 0; i < n; ++rowi, ++i){
         if (rowi == num_row) rowi = 0;
-        p_out[rowi] += cheapr_is_na_str(p_x[i]);
+        p_out[rowi] += is_na_str(p_x[i]);
       }
       break;
     }
@@ -759,17 +756,17 @@ SEXP cpp_matrix_row_na_counts(SEXP x){
       Rcomplex *p_x = COMPLEX(x);
       for (R_xlen_t i = 0, rowi = 0; i < n; ++rowi, ++i){
         if (rowi == num_row) rowi = 0;
-        p_out[rowi] += cheapr_is_na_cplx(p_x[i]);
+        p_out[rowi] += is_na_cplx(p_x[i]);
       }
       break;
     }
     default: {
-      Rf_unprotect(1);
+      YIELD(1);
       Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
     }
     }
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 [[cpp11::register]]
@@ -781,7 +778,7 @@ SEXP cpp_matrix_col_na_counts(SEXP x){
   R_xlen_t num_col = Rf_ncols(x);
   R_xlen_t n = Rf_xlength(x);
   bool new_col;
-  SEXP out = Rf_protect(Rf_allocVector(INTSXP, num_col));
+  SEXP out = SHIELD(new_vec(INTSXP, num_col));
   int *p_out = INTEGER(out);
   memset(p_out, 0, num_col * sizeof(int));
   if (num_row > 0 && num_col > 0){
@@ -795,7 +792,7 @@ SEXP cpp_matrix_col_na_counts(SEXP x){
           ++coli;
           rowi = 0;
         }
-        p_out[coli] += cheapr_is_na_int(p_x[i]);
+        p_out[coli] += is_na_int(p_x[i]);
       }
       break;
     }
@@ -807,19 +804,19 @@ SEXP cpp_matrix_col_na_counts(SEXP x){
           ++coli;
           rowi = 0;
         }
-        p_out[coli] += cheapr_is_na_dbl(p_x[i]);
+        p_out[coli] += is_na_dbl(p_x[i]);
       }
       break;
     }
     case CHEAPR_INT64SXP: {
-      long long *p_x = INTEGER64_PTR(x);
+      int_fast64_t *p_x = INTEGER64_PTR(x);
       for (R_xlen_t i = 0, coli = 0, rowi = 0; i < n; ++rowi, ++i){
         new_col = rowi == num_row;
         if (new_col){
           ++coli;
           rowi = 0;
         }
-        p_out[coli] += cheapr_is_na_int64(p_x[i]);
+        p_out[coli] += is_na_int64(p_x[i]);
       }
       break;
     }
@@ -831,7 +828,7 @@ SEXP cpp_matrix_col_na_counts(SEXP x){
           ++coli;
           rowi = 0;
         }
-        p_out[coli] += cheapr_is_na_str(p_x[i]);
+        p_out[coli] += is_na_str(p_x[i]);
       }
       break;
     }
@@ -846,44 +843,44 @@ SEXP cpp_matrix_col_na_counts(SEXP x){
           ++coli;
           rowi = 0;
         }
-        p_out[coli] += cheapr_is_na_cplx(p_x[i]);
+        p_out[coli] += is_na_cplx(p_x[i]);
       }
       break;
     }
     default: {
-      Rf_unprotect(1);
+      YIELD(1);
       Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
     }
     }
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 
 // Helpers to get matrix row and col names
 
 SEXP matrix_rownames(SEXP x) {
-  SEXP dimnames = Rf_protect(Rf_getAttrib(x, R_DimNamesSymbol));
+  SEXP dimnames = SHIELD(Rf_getAttrib(x, R_DimNamesSymbol));
 
-  if (Rf_isNull(dimnames) ||
+  if (is_null(dimnames) ||
       TYPEOF(dimnames) != VECSXP ||
       Rf_length(dimnames) != 2){
-    Rf_unprotect(1);
+    YIELD(1);
     return R_NilValue;
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return VECTOR_ELT(dimnames, 0);
 }
 SEXP matrix_colnames(SEXP x) {
-  SEXP dimnames = Rf_protect(Rf_getAttrib(x, R_DimNamesSymbol));
+  SEXP dimnames = SHIELD(Rf_getAttrib(x, R_DimNamesSymbol));
 
-  if (Rf_isNull(dimnames) ||
+  if (is_null(dimnames) ||
       TYPEOF(dimnames) != VECSXP ||
       Rf_length(dimnames) != 2){
-    Rf_unprotect(1);
+    YIELD(1);
     return R_NilValue;
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return VECTOR_ELT(dimnames, 1);
 }
 
@@ -900,19 +897,19 @@ SEXP cpp_row_na_counts(SEXP x, bool names){
 
   SEXP out;
   if (is_matrix){
-    out = Rf_protect(cpp_matrix_row_na_counts(x)); ++NP;
+    out = SHIELD(cpp_matrix_row_na_counts(x)); ++NP;
     if (names){
-      SEXP row_names = Rf_protect(Rf_duplicate(matrix_rownames(x))); ++NP;
-      Rf_setAttrib(out, R_NamesSymbol, row_names);
+      SEXP row_names = SHIELD(Rf_duplicate(matrix_rownames(x))); ++NP;
+      set_names(out, row_names);
     }
   } else {
-    out = Rf_protect(cpp_df_row_na_counts(x)); ++NP;
+    out = SHIELD(cpp_df_row_na_counts(x)); ++NP;
     if (names){
-      SEXP row_names = Rf_protect(Rf_duplicate(Rf_getAttrib(x, R_RowNamesSymbol))); ++NP;
-      Rf_setAttrib(out, R_NamesSymbol, row_names);
+      SEXP row_names = SHIELD(Rf_duplicate(Rf_getAttrib(x, R_RowNamesSymbol))); ++NP;
+      set_names(out, row_names);
     }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -929,15 +926,17 @@ SEXP cpp_col_na_counts(SEXP x, bool names){
 
   SEXP out;
   if (is_matrix){
-    out = Rf_protect(cpp_matrix_col_na_counts(x)); ++NP;
+    out = SHIELD(cpp_matrix_col_na_counts(x)); ++NP;
     if (names){
-      SEXP col_names = Rf_protect(Rf_duplicate(matrix_colnames(x))); ++NP;
-      Rf_setAttrib(out, R_NamesSymbol, col_names);
+      SEXP col_names = SHIELD(Rf_duplicate(matrix_colnames(x))); ++NP;
+      set_names(out, col_names);
     }
   } else {
-    out = Rf_protect(cpp_df_col_na_counts(x)); ++NP;
-    if (names) cpp_copy_names(x, out, false);
+    out = SHIELD(cpp_df_col_na_counts(x)); ++NP;
+    if (names){
+      set_names(out, get_names(x));
+    }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }

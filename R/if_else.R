@@ -30,7 +30,7 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
   }
 
   if (is.factor(true) || is.factor(false) || is.factor(na)){
-    template_lvls <- combine_levels(true[1L], false[1L], na[1L])
+    template_lvls <- cpp_combine_levels(list(true[1L], false[1L], na[1L]))
     true <- factor_(true, levels = template_lvls)
     false <- factor_(false, levels = template_lvls)
     na <- factor_(na, levels = template_lvls)
@@ -43,7 +43,7 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
   }
 
 
-  if (is_simple_atomic(true) && is_simple_atomic(false) && is_simple_atomic(na)){
+  if (cpp_is_simple_vec(true) && cpp_is_simple_vec(false) && cpp_is_simple_vec(na)){
     return(`mostattributes<-`(
       cpp_if_else(condition, true, false, na),
       attributes(template)

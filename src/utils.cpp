@@ -3,6 +3,22 @@
 // Miscellaneous functions
 // Author: Nick Christofides
 
+static SEXP CHEAPR_CORES = NULL;
+
+// void symbols_init(DllInfo* dll){
+//   CHEAPR_CORES = Rf_install("cheapr.cores");
+// }
+
+[[cpp11::register]]
+SEXP cpp_is_simple_atomic_vec(SEXP x){
+  return scalar_lgl(is_simple_atomic_vec(x));
+}
+
+[[cpp11::register]]
+SEXP cpp_is_simple_vec(SEXP x){
+  return scalar_lgl(is_simple_vec(x));
+}
+
 int int_div(int x, int y){
   return x / y;
 }
@@ -12,12 +28,14 @@ SEXP xlen_to_r(R_xlen_t x){
 }
 
 R_xlen_t vec_length(SEXP x){
-  if (is_df(x)){
-    return cpp_df_nrow(x);
+  if (!Rf_isObject(x) || Rf_isVectorAtomic(x)){
+    return Rf_xlength(x);
+  } else if (is_df(x)){
+    return df_nrow(x);
     // Is x a list?
-  } else if (Rf_isVectorList(x)){
+  } else if (TYPEOF(x) == VECSXP){
     if (Rf_inherits(x, "vctrs_rcrd")){
-      return vec_length(VECTOR_ELT(x, 0));
+      return Rf_length(x) > 0 ? vec_length(VECTOR_ELT(x, 0)) : 0;
     } else if (Rf_inherits(x, "POSIXlt")){
       const SEXP *p_x = VECTOR_PTR_RO(x);
       R_xlen_t out = 0;
@@ -33,7 +51,7 @@ R_xlen_t vec_length(SEXP x){
     }
     // Catch-all
   } else {
-    return Rf_xlength(x);
+    return r_length(x);
   }
 }
 
@@ -43,20 +61,17 @@ SEXP cpp_vector_length(SEXP x){
 }
 
 int num_cores(){
-  SEXP num_cores = Rf_protect(Rf_GetOption1(Rf_installChar(Rf_mkChar("cheapr.cores"))));
-  int out = Rf_asInteger(num_cores);
-  Rf_unprotect(1);
-  return out >= 1 ? out : 1;
-}
-
-R_xlen_t cpp_df_nrow(SEXP x){
-  return Rf_xlength(Rf_getAttrib(x, R_RowNamesSymbol));
+  if (CHEAPR_CORES == NULL){
+    CHEAPR_CORES = install_utf8("cheapr.cores");
+  }
+  int n_cores = Rf_asInteger(Rf_GetOption1(CHEAPR_CORES));
+  return n_cores >= 1 ? n_cores : 1;
 }
 
 SEXP r_address(SEXP x) {
   static char buf[1000];
   snprintf(buf, 1000, "%p", (void*) x);
-  return Rf_mkChar(buf);
+  return make_utf8_char(buf);
 }
 
 [[cpp11::register]]
@@ -64,9 +79,254 @@ SEXP cpp_address(SEXP x){
   return Rf_ScalarString(r_address(x));
 }
 
+// Copy atomic elements from source to target
+
+[[cpp11::register]]
+void cpp_set_copy_elements(SEXP source, SEXP target){
+  if (TYPEOF(source) != TYPEOF(target)){
+    Rf_error("`typeof(target)` must match `typeof(source)`");
+  }
+  R_xlen_t n = Rf_xlength(source);
+
+  if (n != Rf_xlength(target)){
+    Rf_error("target and source must have the same length");
+  }
+
+  switch (TYPEOF(source)){
+  case NILSXP: {
+    break;
+  }
+  case LGLSXP:
+  case INTSXP: {
+    int *p_source = INTEGER(source);
+    int *p_target = INTEGER(target);
+    memmove(&p_target[0], &p_source[0], n * sizeof(int));
+    break;
+  }
+  case REALSXP: {
+    double *p_source = REAL(source);
+    double *p_target = REAL(target);
+    memmove(&p_target[0], &p_source[0], n * sizeof(double));
+    break;
+  }
+  case STRSXP: {
+    const SEXP *p_source = STRING_PTR_RO(source);
+    for (R_xlen_t i = 0; i < n; ++i){
+      SET_STRING_ELT(target, i, p_source[i]);
+    }
+    break;
+  }
+  case CPLXSXP: {
+    Rcomplex *p_source = COMPLEX(source);
+    Rcomplex *p_target = COMPLEX(target);
+    memmove(&p_target[0], &p_source[0], n * sizeof(Rcomplex));
+    break;
+  }
+  case RAWSXP: {
+    Rbyte *p_source = RAW(source);
+    Rbyte *p_target = RAW(target);
+    memmove(&p_target[0], &p_source[0], n * sizeof(Rbyte));
+    break;
+  }
+  default: {
+    Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(source)));
+  }
+  }
+}
+
+// Deep copy of data and attributes
+
 [[cpp11::register]]
 SEXP r_copy(SEXP x){
   return Rf_duplicate(x);
+}
+
+
+// Shallow copy of data and attributes
+
+[[cpp11::register]]
+SEXP cpp_shallow_copy(SEXP x){
+  return Rf_shallow_duplicate(x);
+}
+
+
+// Full copy of data and shallow copy of attributes
+
+[[cpp11::register]]
+SEXP cpp_semi_copy(SEXP x){
+
+  // If no attributes then we can just full-copy immediately
+
+  if (is_null(ATTRIB(x))){
+    return Rf_duplicate(x);
+  }
+
+  bool altrep = ALTREP(x);
+
+  if (!altrep && TYPEOF(x) == VECSXP){
+
+    // Lists
+
+    R_xlen_t n = Rf_xlength(x);
+    SEXP out = SHIELD(new_vec(VECSXP, n));
+    const SEXP *p_x = VECTOR_PTR_RO(x);
+    for (R_xlen_t i = 0; i < n; ++i){
+      SET_VECTOR_ELT(out, i, Rf_duplicate(p_x[i]));
+    }
+    SHALLOW_DUPLICATE_ATTRIB(out, x);
+    YIELD(1);
+    return out;
+  } else if (!altrep && cpp_is_simple_atomic_vec(x)){
+
+    // Atomic vectors
+
+    SEXP out = SHIELD(new_vec(TYPEOF(x), Rf_xlength(x)));
+    cpp_set_copy_elements(x, out);
+    SHALLOW_DUPLICATE_ATTRIB(out, x);
+    YIELD(1);
+    return out;
+  } else {
+
+    // All other R objects
+    // This method sometimes full copies twice
+    // So I don't use it for non-ALTREP atomic vectors
+
+    SEXP out = SHIELD(Rf_shallow_duplicate(x));
+    cpp_set_rm_attributes(out);
+    SHIELD(out = Rf_duplicate(out));
+    SHALLOW_DUPLICATE_ATTRIB(out, x);
+    YIELD(2);
+    return out;
+  }
+}
+
+// SEXP cpp_semi_copy(SEXP x){
+//   SEXP attrs = ATTRIB(x);
+//   if (is_null(attrs)){
+//     return Rf_duplicate(x);
+//   }
+//   SEXP out = SHIELD(Rf_shallow_duplicate(x));
+//   cpp_set_rm_attributes(out);
+//   SHIELD(out = Rf_duplicate(out));
+//   SHALLOW_DUPLICATE_ATTRIB(out, x);
+//   // SHIELD(attrs = Rf_shallow_duplicate(attrs));
+//   // cpp_set_add_attributes(out, attrs, false);
+//   YIELD(2);
+//   return out;
+// }
+
+// The below causes strange issues
+
+// SEXP cpp_semi_copy(SEXP x){
+//   SEXP attrs = ATTRIB(x);
+//   if (is_null(attrs)){
+//     return Rf_duplicate(x);
+//   }
+//   cpp_set_rm_attributes(x);
+//   SEXP out = SHIELD(Rf_duplicate(x));
+//   SEXP new_attrs = SHIELD(Rf_shallow_duplicate(attrs));
+//
+//   // Re-add attributes back to x
+//   cpp_set_add_attributes(x, attrs, false);
+//   cpp_set_add_attributes(out, new_attrs, false);
+//
+//   YIELD(2);
+//   return out;
+// }
+
+void rm_attrs(SEXP x){
+  SEXP current = ATTRIB(x);
+  while (current != R_NilValue){
+    Rf_setAttrib(x, TAG(current), R_NilValue);
+    current = CDR(current);
+  }
+}
+
+double cpp_sum(SEXP x){
+
+  R_xlen_t n = Rf_xlength(x);
+
+  double sum = 0;
+
+  switch (CHEAPR_TYPEOF(x)){
+
+  case LGLSXP:
+  case INTSXP: {
+
+    const int *p_x = INTEGER(x);
+
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i){
+      sum = is_na_dbl(sum) || is_na_int(p_x[i]) ? NA_REAL : sum + p_x[i];
+    }
+    break;
+  }
+  case CHEAPR_INT64SXP: {
+
+    const int_fast64_t *p_x = INTEGER64_PTR(x);
+
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i){
+      sum = is_na_dbl(sum) || is_na_int64(p_x[i]) ? NA_REAL : sum + p_x[i];
+    }
+    break;
+  }
+  default: {
+
+    const double *p_x = REAL(x);
+
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i) sum += p_x[i];
+    break;
+  }
+  }
+  return sum;
+}
+
+double cpp_min(SEXP x){
+
+  R_xlen_t n = Rf_xlength(x);
+  switch (CHEAPR_TYPEOF(x)){
+
+  case LGLSXP:
+  case INTSXP: {
+
+    if (n == 0) return R_PosInf;
+
+    int *p_x = INTEGER(x);
+    int out = integer_max_;
+
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i){
+      out = is_na_int(out) || is_na_int(p_x[i]) ? NA_INTEGER : std::min(out, p_x[i]);
+    }
+    return out == NA_INTEGER ? NA_REAL : out;
+  }
+  case CHEAPR_INT64SXP: {
+
+    if (n == 0) return R_PosInf;
+
+    int_fast64_t *p_x = INTEGER64_PTR(x);
+    int_fast64_t out = integer64_max_;
+
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i){
+      out = is_na_int64(out) || is_na_int64(p_x[i]) ? NA_INTEGER64 : std::min(out, p_x[i]);
+    }
+    return out == NA_INTEGER64 ? NA_REAL : out;
+  }
+  default: {
+
+    double *p_x = REAL(x);
+    double out = R_PosInf;
+
+    OMP_FOR_SIMD
+    for (R_xlen_t i = 0; i < n; ++i){
+      out = is_na_dbl(out) || is_na_dbl(p_x[i]) ? NA_REAL : std::min(out, p_x[i]);
+    }
+    return out;
+  }
+  }
 }
 
 // Internal-only function
@@ -81,18 +341,18 @@ double var_sum_squared_diff(SEXP x, double mu){
 
   // NA values are always ignored here
 
-  if (!cheapr_is_na_dbl(mu)){
+  if (!is_na_dbl(mu)){
     switch (TYPEOF(x)){
 
     case INTSXP: {
-      int *p_x = INTEGER(x);
+      const int *p_x = INTEGER(x);
       // if (std::abs(mu - std::round(mu)) < std::numeric_limits<double>::epsilon()){
-      //   long long temp = 0;
-      //   long long temp2;
-      //   long long llmu = mu;
-      //   long long temp1;
+      //   int_fast64_t temp = 0;
+      //   int_fast64_t temp2;
+      //   int_fast64_t llmu = mu;
+      //   int_fast64_t temp1;
       //   for (R_xlen_t i = 0; i < n; ++i){
-      //     if (cheapr_is_na_int(p_x[i])) continue;
+      //     if (is_na_int(p_x[i])) continue;
       //     temp1 = p_x[i];
       //     temp2 = std::pow(temp1 - llmu, 2);
       //     temp += temp2;
@@ -100,15 +360,15 @@ double var_sum_squared_diff(SEXP x, double mu){
       //   out = temp;
       // } else {
       for (R_xlen_t i = 0; i < n; ++i){
-        if (cheapr_is_na_int(p_x[i])) continue;
+        if (is_na_int(p_x[i])) continue;
         out += std::pow(p_x[i] - mu, 2);
       }
       break;
     }
     default: {
-      double *p_x = REAL(x);
+      const double *p_x = REAL(x);
       for (R_xlen_t i = 0; i < n; ++i){
-        if (cheapr_is_na_dbl(p_x[i])) continue;
+        if (is_na_dbl(p_x[i])) continue;
         out += std::pow(p_x[i] - mu, 2);
       }
       break;
@@ -186,43 +446,43 @@ SEXP cpp_bin(SEXP x, SEXP breaks, bool codes, bool right,
   switch(TYPEOF(x)){
   case INTSXP: {
     if (codes){
-    SEXP out = Rf_protect(Rf_allocVector(INTSXP, n));
-    Rf_protect(breaks = Rf_coerceVector(breaks, REALSXP));
-    int *p_x = INTEGER(x);
-    double *p_b = REAL(breaks);
-    int *p_out = INTEGER(out);
-    CHEAPR_BIN_CODES(cheapr_is_na_int, NA_INTEGER);
-    Rf_unprotect(2);
+    SEXP out = SHIELD(new_vec(INTSXP, n));
+    SHIELD(breaks = coerce_vec(breaks, REALSXP));
+    const int *p_x = INTEGER(x);
+    const double *p_b = REAL(breaks);
+    int* RESTRICT p_out = INTEGER(out);
+    CHEAPR_BIN_CODES(is_na_int, NA_INTEGER);
+    YIELD(2);
     return out;
   } else {
-    SEXP out = Rf_protect(Rf_duplicate(x));
-    Rf_protect(breaks = Rf_coerceVector(breaks, REALSXP));
-    int *p_x = INTEGER(x);
-    double *p_b = REAL(breaks);
-    int *p_out = INTEGER(out);
-    CHEAPR_BIN_NCODES(cheapr_is_na_int, NA_INTEGER);
-    Rf_unprotect(2);
+    SEXP out = SHIELD(cpp_semi_copy(x));
+    SHIELD(breaks = coerce_vec(breaks, REALSXP));
+    const int *p_x = INTEGER(x);
+    const double *p_b = REAL(breaks);
+    int* RESTRICT p_out = INTEGER(out);
+    CHEAPR_BIN_NCODES(is_na_int, NA_INTEGER);
+    YIELD(2);
     return out;
   }
   }
   default: {
     if (codes){
-    SEXP out = Rf_protect(Rf_allocVector(INTSXP, n));
-    Rf_protect(breaks = Rf_coerceVector(breaks, REALSXP));
-    double *p_x = REAL(x);
-    double *p_b = REAL(breaks);
-    int *p_out = INTEGER(out);
-    CHEAPR_BIN_CODES(cheapr_is_na_dbl, NA_INTEGER);
-    Rf_unprotect(2);
+    SEXP out = SHIELD(new_vec(INTSXP, n));
+    SHIELD(breaks = coerce_vec(breaks, REALSXP));
+    const double *p_x = REAL(x);
+    const double *p_b = REAL(breaks);
+    int* RESTRICT p_out = INTEGER(out);
+    CHEAPR_BIN_CODES(is_na_dbl, NA_INTEGER);
+    YIELD(2);
     return out;
   } else {
-    SEXP out = Rf_protect(Rf_duplicate(x));
-    Rf_protect(breaks = Rf_coerceVector(breaks, REALSXP));
-    double *p_x = REAL(x);
-    double *p_b = REAL(breaks);
-    double *p_out = REAL(out);
-    CHEAPR_BIN_NCODES(cheapr_is_na_dbl, NA_REAL);
-    Rf_unprotect(2);
+    SEXP out = SHIELD(cpp_semi_copy(x));
+    SHIELD(breaks = coerce_vec(breaks, REALSXP));
+    const double *p_x = REAL(x);
+    const double *p_b = REAL(breaks);
+    double* RESTRICT p_out = REAL(out);
+    CHEAPR_BIN_NCODES(is_na_dbl, NA_REAL);
+    YIELD(2);
     return out;
   }
   }
@@ -260,8 +520,8 @@ SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
   bool no_scalar = no_size == 1;
   bool na_scalar = na_size == 1;
 
-  int *p_x = LOGICAL(condition);
-  SEXP out = Rf_protect(Rf_allocVector(TYPEOF(yes), n)); ++NP;
+  const int *p_x = LOGICAL(condition);
+  SEXP out = SHIELD(new_vec(TYPEOF(yes), n)); ++NP;
 
   switch (TYPEOF(yes)){
   case NILSXP: {
@@ -269,10 +529,10 @@ SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
   }
   case LGLSXP:
   case INTSXP: {
-    int *p_out = INTEGER(out);
-    int *p_yes = INTEGER(yes);
-    int *p_no = INTEGER(no);
-    int *p_na = INTEGER(na);
+    int* RESTRICT p_out = INTEGER(out);
+    const int *p_yes = INTEGER(yes);
+    const int *p_no = INTEGER(no);
+    const int *p_na = INTEGER(na);
 
     for (R_xlen_t i = 0; i < n; ++i){
       switch(p_x[i]){
@@ -289,16 +549,14 @@ SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
         break;
       }
       }
-      // p_out[i] = p_x[i] == NA_LOGICAL ? na_val : p_x[i] ?
-      // p_yes[yes_scalar ? 0 : i] : p_no[no_scalar ? 0 : i];
     }
     break;
   }
   case REALSXP: {
-    double *p_out = REAL(out);
-    double *p_yes = REAL(yes);
-    double *p_no = REAL(no);
-    double *p_na = REAL(na);
+    double* RESTRICT p_out = REAL(out);
+    const double *p_yes = REAL(yes);
+    const double *p_no = REAL(no);
+    const double *p_na = REAL(na);
 
     for (R_xlen_t i = 0; i < n; ++i){
       switch(p_x[i]){
@@ -342,9 +600,9 @@ SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
     break;
   }
   case CPLXSXP: {
-    Rcomplex *p_yes = COMPLEX(yes);
-    Rcomplex *p_no = COMPLEX(no);
-    Rcomplex *p_na = COMPLEX(na);
+    const Rcomplex *p_yes = COMPLEX(yes);
+    const Rcomplex *p_no = COMPLEX(no);
+    const Rcomplex *p_na = COMPLEX(na);
 
     for (R_xlen_t i = 0; i < n; ++i){
       switch(p_x[i]){
@@ -365,9 +623,9 @@ SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
     break;
   }
   case RAWSXP: {
-    Rbyte *p_yes = RAW(yes);
-    Rbyte *p_no = RAW(no);
-    Rbyte *p_na = RAW(na);
+    const Rbyte *p_yes = RAW(yes);
+    const Rbyte *p_no = RAW(no);
+    const Rbyte *p_na = RAW(na);
 
     for (R_xlen_t i = 0; i < n; ++i){
       switch(p_x[i]){
@@ -387,12 +645,35 @@ SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
     }
     break;
   }
+  case VECSXP: {
+    const SEXP *p_yes = VECTOR_PTR_RO(yes);
+    const SEXP *p_no = VECTOR_PTR_RO(no);
+    const SEXP *p_na = VECTOR_PTR_RO(na);
+
+    for (R_xlen_t i = 0; i < n; ++i){
+      switch(p_x[i]){
+      case true: {
+      SET_VECTOR_ELT(out, i, p_yes[yes_scalar ? 0 : i]);
+      break;
+    }
+      case false: {
+        SET_VECTOR_ELT(out, i, p_no[no_scalar ? 0 : i]);
+        break;
+      }
+      default: {
+        SET_VECTOR_ELT(out, i, p_na[na_scalar ? 0 : i]);
+        break;
+      }
+      }
+    }
+    break;
+  }
   default: {
-    Rf_unprotect(NP);
+    YIELD(NP);
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(yes)));
   }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -403,7 +684,7 @@ SEXP cpp_lgl_count(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
 
-  int *p_x = LOGICAL(x);
+  const int *p_x = LOGICAL(x);
 
   R_xlen_t i;
   R_xlen_t ntrue = 0, nfalse = 0;
@@ -423,81 +704,26 @@ SEXP cpp_lgl_count(SEXP x){
   }
   R_xlen_t nna = n - ntrue - nfalse;
 
-  SEXP out = Rf_protect(Rf_allocVector(n > integer_max_ ? REALSXP : INTSXP, 3));
-  SEXP names = Rf_protect(Rf_allocVector(STRSXP, 3));
-  SET_STRING_ELT(names, 0, Rf_mkChar("true"));
-  SET_STRING_ELT(names, 1, Rf_mkChar("false"));
-  SET_STRING_ELT(names, 2, Rf_mkChar("na"));
+  SEXP out = SHIELD(new_vec(n > integer_max_ ? REALSXP : INTSXP, 3));
+  SEXP names = SHIELD(new_vec(STRSXP, 3));
+  SET_STRING_ELT(names, 0, make_utf8_char("true"));
+  SET_STRING_ELT(names, 1, make_utf8_char("false"));
+  SET_STRING_ELT(names, 2, make_utf8_char("na"));
 
   if (n > integer_max_){
-    SET_REAL_ELT(out, 0, (double) ntrue);
-    SET_REAL_ELT(out, 1, (double) nfalse);
-    SET_REAL_ELT(out, 2, (double) nna);
+    SET_REAL_ELT(out, 0, static_cast<double>(ntrue));
+    SET_REAL_ELT(out, 1, static_cast<double>(nfalse));
+    SET_REAL_ELT(out, 2, static_cast<double>(nna));
   } else {
-    SET_INTEGER_ELT(out, 0, (int) ntrue);
-    SET_INTEGER_ELT(out, 1, (int) nfalse);
-    SET_INTEGER_ELT(out, 2, (int) nna);
+    SET_INTEGER_ELT(out, 0, static_cast<int>(ntrue));
+    SET_INTEGER_ELT(out, 1, static_cast<int>(nfalse));
+    SET_INTEGER_ELT(out, 2, static_cast<int>(nna));
   }
 
-  Rf_setAttrib(out, R_NamesSymbol, names);
+  set_names(out, names);
 
-  Rf_unprotect(2);
+  YIELD(2);
   return out;
-}
-
-// Copy atomic elements from source to target
-
-[[cpp11::register]]
-void cpp_set_copy_elements(SEXP source, SEXP target){
-  if (TYPEOF(source) != TYPEOF(target)){
-    Rf_error("`typeof(target)` must match `typeof(source)`");
-  }
-  R_xlen_t n = Rf_xlength(source);
-
-  if (n != Rf_xlength(target)){
-    Rf_error("target and source must have the same length");
-  }
-
-  switch (TYPEOF(source)){
-  case NILSXP: {
-    break;
-  }
-  case LGLSXP:
-  case INTSXP: {
-    int *p_source = INTEGER(source);
-    int *p_target = INTEGER(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(int));
-    break;
-  }
-  case REALSXP: {
-    double *p_source = REAL(source);
-    double *p_target = REAL(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(double));
-    break;
-  }
-  case STRSXP: {
-    const SEXP *p_source = STRING_PTR_RO(source);
-    for (R_xlen_t i = 0; i < n; ++i){
-      SET_STRING_ELT(target, i, p_source[i]);
-    }
-    break;
-  }
-  case CPLXSXP: {
-    Rcomplex *p_source = COMPLEX(source);
-    Rcomplex *p_target = COMPLEX(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(Rcomplex));
-    break;
-  }
-  case RAWSXP: {
-    Rbyte *p_source = RAW(source);
-    Rbyte *p_target = RAW(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(Rbyte));
-    break;
-  }
-  default: {
-    Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(source)));
-  }
-  }
 }
 
 // Essentially `x & y` but updates x by reference
@@ -541,7 +767,7 @@ SEXP cpp_set_or(SEXP x, SEXP y){
   R_xlen_t i, yi;
 
   int *p_x = LOGICAL(x);
-  int *p_y = LOGICAL(y);
+  const int *p_y = LOGICAL(y);
 
 
   for (i = yi = 0; i < n; yi = (++yi == yn) ? 0 : yi, ++i){
@@ -563,17 +789,17 @@ SEXP cpp_set_or(SEXP x, SEXP y){
 
 SEXP coerce_vector(SEXP source, SEXPTYPE type){
   if (type == CHEAPR_INT64SXP){
-    SEXP temp = Rf_protect(Rf_coerceVector(source, REALSXP));
-    SEXP out = Rf_protect(cpp_numeric_to_int64(temp));
-    Rf_unprotect(2);
+    SEXP temp = SHIELD(coerce_vec(source, REALSXP));
+    SEXP out = SHIELD(cpp_numeric_to_int64(temp));
+    YIELD(2);
     return out;
   } else if (is_int64(source)){
-    SEXP temp = Rf_protect(cpp_int64_to_numeric(source));
-    SEXP out = Rf_protect(Rf_coerceVector(temp, type));
-    Rf_unprotect(2);
+    SEXP temp = SHIELD(cpp_int64_to_numeric(source));
+    SEXP out = SHIELD(coerce_vec(temp, type));
+    YIELD(2);
     return out;
   } else {
-    return Rf_coerceVector(source, type);
+    return coerce_vec(source, type);
   }
 }
 
@@ -610,7 +836,7 @@ double growth_rate(double a, double b, double n){
 SEXP cpp_growth_rate(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   if (n == 0){
-    return Rf_allocVector(REALSXP, 0);
+    return new_vec(REALSXP, 0);
   }
   if (n == 1){
     return Rf_ScalarReal(NA_REAL);
@@ -626,8 +852,8 @@ SEXP cpp_growth_rate(SEXP x){
     break;
   }
   case CHEAPR_INT64SXP: {
-    long long int x_n = INTEGER64_PTR(x)[n - 1];
-    long long int x_1 = INTEGER64_PTR(x)[0];
+    int_fast64_t x_n = INTEGER64_PTR(x)[n - 1];
+    int_fast64_t x_1 = INTEGER64_PTR(x)[0];
     a = R_SCALAR_AS_DOUBLE(x_1, NA_INTEGER64);
     b = R_SCALAR_AS_DOUBLE(x_n, NA_INTEGER64);
     break;
@@ -646,225 +872,302 @@ SEXP cpp_growth_rate(SEXP x){
 
 SEXP create_df_row_names(int n){
   if (n > 0){
-    SEXP out = Rf_protect(Rf_allocVector(INTSXP, 2));
+    SEXP out = SHIELD(new_vec(INTSXP, 2));
     INTEGER(out)[0] = NA_INTEGER;
     INTEGER(out)[1] = -n;
-    Rf_unprotect(1);
+    YIELD(1);
     return out;
   } else {
-    return Rf_allocVector(INTSXP, 0);
+    return new_vec(INTSXP, 0);
   }
 }
 
-// SEXP cpp_c(SEXP x){
-//   if (!Rf_isVectorList(x)){
-//     Rf_error("x must be a list of vectors");
+[[cpp11::register]]
+SEXP cpp_name_repair(SEXP names, SEXP dup_sep, SEXP empty_sep){
+  int NP = 0;
+  if (is_null(names)) return names;
+
+  if (TYPEOF(names) != STRSXP){
+    Rf_error("`names` must be a character vector of names in %s", __func__);
+  }
+  if (TYPEOF(dup_sep) != STRSXP || Rf_length(dup_sep) != 1){
+    Rf_error("`dup_sep` must be a character vector of length 1 in %s", __func__);
+  }
+  if (TYPEOF(empty_sep) != STRSXP || Rf_length(empty_sep) != 1){
+    Rf_error("`empty_sep` must be a character vector of length 1 in %s", __func__);
+  }
+  int n = Rf_length(names);
+  SEXP is_dup = SHIELD(Rf_duplicated(names, FALSE)); ++NP;
+  SEXP is_dup_from_last = SHIELD(Rf_duplicated(names, TRUE)); ++NP;
+  cpp_set_or(is_dup, is_dup_from_last);
+
+  SEXP r_true = SHIELD(scalar_lgl(true)); ++NP;
+  SEXP dup_locs = SHIELD(cpp_which_val(is_dup, r_true, false)); ++NP;
+
+  int n_dups = Rf_length(dup_locs);
+
+  SEXP out = SHIELD(new_vec(STRSXP, n)); ++NP;
+  cpp_set_copy_elements(names, out);
+
+  SEXP temp, replace;
+
+  if (n_dups > 0){
+    temp = SHIELD(sset_vec(names, dup_locs, true)); ++NP;
+    replace = SHIELD(base_paste0(temp, dup_sep, dup_locs)); ++NP;
+    cpp_loc_set_replace(out, dup_locs, replace);
+  }
+
+  SEXP is_empty = SHIELD(new_vec(LGLSXP, n)); ++NP;
+  int *p_is_empty = LOGICAL(is_empty);
+  bool empty;
+  int n_empty = 0;
+
+  for (int i = 0; i < n; ++i){
+    empty = (STRING_ELT(names, i) == R_BlankString);
+    n_empty += empty;
+    p_is_empty[i] = empty;
+  }
+
+  SEXP r_n_empty = SHIELD(Rf_ScalarInteger(n_empty)); ++NP;
+
+  if (n_empty > 0){
+    SEXP empty_locs = SHIELD(cpp_val_find(is_empty, r_true, false, r_n_empty)); ++NP;
+    temp = SHIELD(sset_vec(names, empty_locs, true)); ++NP;
+    replace = SHIELD(base_paste0(temp, empty_sep, empty_locs)); ++NP;
+    cpp_loc_set_replace(out, empty_locs, replace);
+  }
+
+  YIELD(NP);
+  return out;
+}
+
+[[cpp11::register]]
+SEXP cpp_reconstruct(SEXP target, SEXP source, SEXP target_attr_names, SEXP source_attr_names,
+                     bool shallow_copy){
+
+  int NP = 0;
+
+  if (shallow_copy){
+    SHIELD(target = Rf_shallow_duplicate(target)); ++NP;
+  }
+
+  if (address_equal(target, source)){
+    YIELD(NP);
+    return target;
+  }
+
+  SEXP target_attrs = ATTRIB(target);
+  SEXP source_attrs = ATTRIB(source);
+
+  // Start from clean slate - no attributes
+  cpp_set_rm_attributes(target);
+
+  SEXP tag = R_NilValue;
+  SEXP current = R_NilValue;
+
+  const SEXP *p_ta = STRING_PTR_RO(target_attr_names);
+  const SEXP *p_sa = STRING_PTR_RO(source_attr_names);
+
+  const int n_target = Rf_length(target_attr_names);
+  const int n_source = Rf_length(source_attr_names);
+
+  for (int i = 0; i < n_target; ++i){
+    current = target_attrs;
+    while (!is_null(current)){
+
+      tag = TAG(current);
+
+      if (PRINTNAME(tag) == p_ta[i]){
+        Rf_setAttrib(target, tag, CAR(current));
+        break;
+      }
+      current = CDR(current);
+    }
+  }
+
+  for (int i = 0; i < n_source; ++i){
+    current = source_attrs;
+    while (!is_null(current)){
+
+      tag = TAG(current);
+
+      if (PRINTNAME(tag) == p_sa[i]){
+        Rf_setAttrib(target, tag, CAR(current));
+        break;
+      }
+      current = CDR(current);
+    }
+  }
+
+  YIELD(NP);
+  return target;
+}
+
+// Coalesce a list of string vectors
+
+[[cpp11::register]]
+SEXP cpp_str_coalesce(SEXP x){
+  if (TYPEOF(x) != VECSXP){
+    Rf_error("`x` must be a list of character vectors in %s", __func__);
+  }
+
+  int n = Rf_xlength(x);
+
+  R_xlen_t out_size = 0;
+
+  const SEXP *p_x = VECTOR_PTR_RO(x);
+
+  for (R_xlen_t i = 0; i < n; ++i){
+    if (Rf_xlength(p_x[i]) == 0){
+      return Rf_allocVector(STRSXP, 0);
+    }
+    if (TYPEOF(p_x[i]) != STRSXP){
+      Rf_error("All elements of `x` must be character vectors in %s", __func__);
+    }
+    out_size = std::max(out_size, Rf_xlength(p_x[i]));
+  }
+
+
+  SEXP out = SHIELD(Rf_allocVector(STRSXP, out_size));
+
+  SEXP inner_char;
+  PROTECT_INDEX inner_char_idx;
+
+  R_ProtectWithIndex(inner_char = R_BlankString, &inner_char_idx);
+
+
+  for (R_xlen_t i = 0; i < out_size; ++i){
+    for (R_xlen_t j = 0; j < n; ++j){
+      R_Reprotect(inner_char = STRING_ELT(p_x[j], i % Rf_xlength(p_x[j])), inner_char_idx);
+      if (inner_char != R_BlankString){
+        SET_STRING_ELT(out, i, inner_char);
+        break;
+      }
+    }
+  }
+  YIELD(2);
+  return out;
+}
+
+// Keep this for now, may use in the future
+
+// #include <cpp11.hpp>
+// #include "cheapr.h"
+// #include <R.h>
+// #include <Rinternals.h>
+// #include <functional>
+// #include <unordered_map>
+//
+// struct sexp_metadata {
+//   void* getter;                                 // Direct pointer to data (e.g., INTEGER(x))
+//   std::function<void(R_xlen_t, void*)> setter;    // Setter function (kept for flexibility)
+//   void* ptr_to_x;                                 // Pointer to the SEXP object x
+//   int type_id;
+// };
+//
+// // Helper function to create metadata for a specific SEXPTYPE (compile-time)
+// template<int SEXPTYPE>
+// sexp_metadata create_metadata(SEXP x) {
+//   sexp_metadata metadata;
+//   metadata.ptr_to_x = static_cast<void*>(x);      // Store pointer to x
+//   metadata.type_id = SEXPTYPE;
+//
+//   if constexpr (SEXPTYPE == INTSXP) {
+//     void* data = static_cast<void*>(INTEGER(x));  // Single pointer for integer data
+//     metadata.getter = data;
+//     metadata.setter = [data](R_xlen_t i, void* value) {
+//       static_cast<int*>(data)[i] = *static_cast<int*>(value);
+//     };
+//   } else if constexpr (SEXPTYPE == REALSXP) {
+//     void* data = static_cast<void*>(REAL(x));  // Single pointer for integer data
+//     metadata.getter = data;
+//     metadata.setter = [data](R_xlen_t i, void* value) {
+//       static_cast<double*>(data)[i] = *static_cast<double*>(value);
+//     };
+//   } else if constexpr (SEXPTYPE == LGLSXP) {
+//     void* data = static_cast<void*>(LOGICAL(x));  // Single pointer for integer data
+//     metadata.getter = data;
+//     metadata.setter = [data](R_xlen_t i, void* value) {
+//       static_cast<int*>(data)[i] = *static_cast<int*>(value);
+//     };
+//   } else if constexpr (SEXPTYPE == STRSXP) {
+//     void* data = const_cast<void*>(reinterpret_cast<const void*>(STRING_PTR_RO(x)));
+//     metadata.getter = data;
+//     metadata.setter = [x](R_xlen_t i, void* value) {
+//       SET_STRING_ELT(x, i, static_cast<SEXP>(value));
+//     };
+//   } else {
+//     Rf_error("Unknown SEXP type");
 //   }
-//   int NP = 0;
-//   R_xlen_t n = Rf_xlength(x);
-//   const SEXP *p_x = VECTOR_PTR_RO(x);
 //
-//   int vector_type = NILSXP;
-//   R_xlen_t out_size = 0;
+//   return metadata;
+// }
 //
-//   for (R_xlen_t i = 0; i < n; ++i){
-//     vector_type = std::max(vector_type, TYPEOF(p_x[i]));
-//     out_size += Rf_xlength(p_x[i]);
-//     if (Rf_isFactor(p_x[i])){;
-//       return(cpp11::package("cheapr")["combine_factors"](x));
-//     }
-//   }
-//
-//   R_xlen_t k = 0;
-//
-//   switch(vector_type){
-//   case NILSXP: {
-//     return R_NilValue;
-//   }
+// // Function to get metadata based on runtime TYPEOF(x)
+// sexp_metadata get_sexp_metadata(SEXP x) {
+//   int type = TYPEOF(x);
+//   switch (type) {
+//   case INTSXP:
+//     return create_metadata<INTSXP>(x);
+//   case REALSXP:
+//     return create_metadata<REALSXP>(x);
 //   case LGLSXP:
-//   case INTSXP: {
-//     SEXP out = Rf_protect(Rf_allocVector(vector_type, out_size)); ++NP;
-//     int *p_out = INTEGER(out);
-//
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       R_xlen_t m = Rf_xlength(p_x[i]);
-//       int *p_temp = INTEGER(TYPEOF(p_x[i]) == vector_type ? p_x[i] : Rf_protect(Rf_coerceVector(p_x[i], vector_type)));
-//       if (TYPEOF(p_x[i]) != vector_type) ++NP;
-//       for (R_xlen_t j = 0; j < m; ++k, ++j){
-//         p_out[k] = p_temp[j];
-//       }
-//     }
-//     Rf_unprotect(NP);
-//     return out;
-//   }
-//   case REALSXP: {
-//     SEXP out = Rf_protect(Rf_allocVector(vector_type, out_size)); ++NP;
-//     double *p_out = REAL(out);
-//
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       R_xlen_t m = Rf_xlength(p_x[i]);
-//       double *p_temp = REAL(TYPEOF(p_x[i]) == vector_type ? p_x[i] : Rf_protect(Rf_coerceVector(p_x[i], vector_type)));
-//       if (TYPEOF(p_x[i]) != vector_type) ++NP;
-//       for (R_xlen_t j = 0; j < m; ++k, ++j){
-//         p_out[k] = p_temp[j];
-//       }
-//     }
-//     Rf_unprotect(NP);
-//     return out;
-//   }
-//   case STRSXP: {
-//     SEXP out = Rf_protect(Rf_allocVector(vector_type, out_size)); ++NP;
-//
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       R_xlen_t m = Rf_xlength(p_x[i]);
-//       const SEXP *p_temp = STRING_PTR_RO(TYPEOF(p_x[i]) == vector_type ? p_x[i] : Rf_protect(Rf_coerceVector(p_x[i], vector_type)));
-//       if (TYPEOF(p_x[i]) != vector_type) ++NP;
-//       for (R_xlen_t j = 0; j < m; ++k, ++j){
-//         SET_STRING_ELT(out, k, p_temp[j]);
-//       }
-//     }
-//     Rf_unprotect(NP);
-//     return out;
-//   }
-//   case CPLXSXP: {
-//     SEXP out = Rf_protect(Rf_allocVector(vector_type, out_size)); ++NP;
-//
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       R_xlen_t m = Rf_xlength(p_x[i]);
-//       Rcomplex *p_temp = COMPLEX(TYPEOF(p_x[i]) == vector_type ? p_x[i] : Rf_protect(Rf_coerceVector(p_x[i], vector_type)));
-//       if (TYPEOF(p_x[i]) != vector_type) ++NP;
-//       for (R_xlen_t j = 0; j < m; ++k, ++j){
-//         SET_COMPLEX_ELT(out, k, p_temp[j]);
-//       }
-//     }
-//     Rf_unprotect(NP);
-//     return out;
-//   }
-//   case VECSXP: {
-//     SEXP out = Rf_protect(Rf_allocVector(vector_type, out_size)); ++NP;
-//
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       R_xlen_t m = Rf_xlength(p_x[i]);
-//       const SEXP *p_temp = VECTOR_PTR_RO(TYPEOF(p_x[i]) == vector_type ? p_x[i] : Rf_protect(Rf_coerceVector(p_x[i], vector_type)));
-//       if (TYPEOF(p_x[i]) != vector_type) ++NP;
-//       for (R_xlen_t j = 0; j < m; ++k, ++j){
-//         SET_VECTOR_ELT(out, k, p_temp[j]);
-//       }
-//     }
-//     Rf_unprotect(NP);
-//     return out;
-//   }
-//
-//   default: {
-//     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(vector_type));
-//   }
+//     return create_metadata<LGLSXP>(x);
+//   case STRSXP:
+//     return create_metadata<STRSXP>(x);
+//   default:
+//     Rf_error("Unsupported SEXP type: %s", Rf_type2char(TYPEOF(x)));
 //   }
 // }
-
-// bool cpp_all_whole_numbers(SEXP x, double tol, bool na_ignore){
-//   R_xlen_t n = Rf_xlength(x);
-//   double adiff;
-//   bool out = false;
-//   switch ( TYPEOF(x) ){
-//   case LGLSXP:
-//   case INTSXP: {
-//     out = true;
-//     break;
-//   }
-//   default: {
-//     if (is_int64(x)){
-//     out = true;
-//     break;
-//   }
-//     out = true;
-//     double *p_x = REAL(x);
-//     for (R_xlen_t i = 0; i < n; ++i) {
-//       adiff = std::fabs(p_x[i] - std::round(p_x[i]));
-//       if (cheapr_is_na_dbl(p_x[i])){
-//         if (na_ignore){
-//           continue;
-//         } else {
-//           out = false;
-//           break;
-//         }
-//       } else if (adiff > tol){
-//         out = false;
-//         break;
-//       }
-//     }
-//     break;
-//   }
-//   }
-//   return out;
-// }
-
-// Potentially useful for rolling calculations
-// Computes the rolling number of true values in a given
-// series of consecutive true values
-
-// SEXP cpp_run_id(SEXP x, bool left_to_right){
-//   if (!Rf_isLogical(x)){
-//     Rf_error("x must be a logical vector");
-//   }
+// R_xlen_t foo(SEXP x){
+//   sexp_metadata metadata = get_sexp_metadata(x);
+//
 //   R_xlen_t count = 0;
-//   R_xlen_t n = Rf_xlength(x);
-//   SEXP out = Rf_protect(Rf_allocVector(INTSXP, n));
-//   int *p_out = INTEGER(out);
-//   int *p_x = LOGICAL(x);
-//   if (left_to_right){
-//     for (R_xlen_t i = 0; i < n; ++i){
-//       count = (count + p_x[i]) * p_x[i];
-//       p_out[i] = count;
-//     }
-//   } else {
-//     for (R_xlen_t i = n - 1; i >= 0; --i){
-//       count = (count + p_x[i]) * p_x[i];
-//       p_out[i] = count;
-//     }
+//
+//   auto* data = static_cast<int*>(metadata.getter);
+//
+//   OMP_FOR_SIMD
+//   for (R_xlen_t i = 0; i < Rf_xlength(x); ++i){
+//     count += is_na_int(data[i]);
 //   }
-//   Rf_unprotect(1);
-//   return out;
+//   return count;
 // }
-
-// Would use data.table as it is very efficient, but would require extra dependency
-// Here x must be an integer vector
-
-// SEXP cpp_between(SEXP x, SEXP lower, SEXP upper){
-//   int *p_x = INTEGER(x);
-//   int n = Rf_length(x);
-//   if (Rf_length(lower) != 1){
-//     Rf_error("lower must be of length 1");
+// R_xlen_t bar(SEXP x){
+//   sexp_metadata metadata = get_sexp_metadata(x);
+//
+//   R_xlen_t count = 0;
+//
+//   // auto* data = static_cast<int*>(metadata.getter);
+//   //
+//   // int val = 1;
+//   //
+//   // OMP_FOR_SIMD
+//   // for (R_xlen_t i = 0; i < Rf_xlength(x); ++i){
+//   //   metadata.setter(i, static_cast<void*>(&val));
+//   // }
+//
+//   auto* data = static_cast<SEXP*>(metadata.getter);
+//
+//   SEXP val = Rf_protect(Rf_mkChar("ok"));
+//
+//   for (R_xlen_t i = 0; i < Rf_xlength(x); ++i){
+//     metadata.setter(i, static_cast<void*>(val));
 //   }
-//   if (Rf_length(upper) != 1){
-//     Rf_error("upper must be of length 1");
-//   }
-//   Rf_protect(lower = Rf_coerceVector(lower, INTSXP));
-//   Rf_protect(upper = Rf_coerceVector(upper, INTSXP));
-//   int lo = Rf_asInteger(lower);
-//   int hi = Rf_asInteger(upper);
-//   if (hi < lo){
-//     int hi2 = hi;
-//     hi = lo;
-//     lo = hi2;
-//   }
-//   SEXP out = Rf_protect(Rf_allocVector(LGLSXP, n));
-//   int *p_out = LOGICAL(out);
-//   bool do_parallel = n >= 100000;
-//   int n_cores = do_parallel ? num_cores() : 1;
-//   if (lo == NA_INTEGER || hi == NA_INTEGER){
-// #pragma omp parallel for simd num_threads(n_cores) if (do_parallel)
-//     for (int i = 0; i < n; ++i){
-//       p_out[i] = NA_LOGICAL;
-//     }
-//   } else {
-//     unsigned int rng = hi - lo;
-// #pragma omp parallel for simd num_threads(n_cores) if (do_parallel)
-//     for (int i = 0; i < n; ++i){
-//       int xi = p_x[i];
-//       p_out[i] = (xi != NA_INTEGER) ? unsigned(xi - lo) <= rng : NA_LOGICAL;
-//     }
-//   }
-//   Rf_unprotect(3);
-//   return out;
+//   YIELD(1);
+//   return count;
 // }
-
+// R_xlen_t foobar(SEXP x){
+//   sexp_metadata metadata = get_sexp_metadata(x);
+//
+//   R_xlen_t count = 0;
+//
+//   auto* data = static_cast<SEXP*>(metadata.getter);
+//
+//   SEXP val = Rf_protect(Rf_mkChar("ok"));
+//
+//   for (R_xlen_t i = 0; i < Rf_xlength(x); ++i){
+//     SET_STRING_ELT(x, i, val);
+//   }
+//   YIELD(1);
+//   return count;
+// }

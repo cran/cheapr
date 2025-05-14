@@ -23,8 +23,6 @@ allv2 <- function(x, value){
   collapse::allv(x, value)
 }
 
-list_as_df <- cpp_list_as_df
-
 check_length <- function(x, n){
   if (length(x) != n){
     stop(paste(deparse2(substitute(x)), "must have length", n))
@@ -52,22 +50,6 @@ tzone <- function(x){
   }
 }
 
-cheapr_rep_len <- function(x, length.out){
-  if (inherits(x, "data.frame")){
-    sset(x, rep_len(attr(x, "row.names"), length.out))
-  } else {
-    rep(x, length.out = length.out)
-  }
-}
-
-cheapr_recycle <- function(x, length){
-  if (length == vector_length(x)){
-    x
-  } else {
-    cheapr_rep_len(x, length)
-  }
-}
-
 set_attr <- cpp_set_add_attr
 set_attrs <- cpp_set_add_attributes
 set_rm_attr <- cpp_set_rm_attr
@@ -77,7 +59,7 @@ cpp_list_rm_null <- function(x, always_shallow_copy = TRUE){
   cpp_drop_null(x, always_shallow_copy)
 }
 list_is_df_like <- function(x){
-  collapse::fnunique(lengths_(x)) <= 1
+  collapse::fnunique(list_lengths(x)) <= 1
 }
 posixlt_is_balanced <- function(x){
   isTRUE(attr(x, "balanced")) && list_is_df_like(x)
@@ -86,8 +68,7 @@ fill_posixlt <- function(x, classed = TRUE){
   if (!inherits(x, "POSIXlt")){
     stop("x must be a POSIXlt")
   }
-  out <- unclass(x)
-  out <- do.call(recycle, out)
+  out <- recycle(.args = unclass(x))
   attributes(out) <- attributes(x)
   if (!posixlt_is_balanced(x)){
     attr(out, "balanced") <- NA
@@ -163,20 +144,6 @@ r_cut_breaks <- function(x, n){
   breaks
 }
 
-# Is x a simple atomic type?
-# logical, integer, double, character, raw, complex
-# including Dates, factors and POSIXcts
-
-# Simple here means it's
-# a) atomic
-# b) attributes aren't data-dependent and so can be all copied
-
-is_simple_atomic <- function(x){
-  is.atomic(x) && (
-    !is.object(x) || inherits(x, c("Date", "POSIXct", "factor", "integer64"))
-  )
-}
-
 # If args is a plain list of items then extract the first element of
 # the top list
 
@@ -189,37 +156,8 @@ as_list_of <- function(...){
   }
 }
 
-# Combine levels of factors
-# Converts non factors into character vectors
-combine_levels <- function(...){
-  dots <- as_list_of(...)
-  get_levels <- function(x){
-    if (is.factor(x)) attr(x, "levels", TRUE) else as.character(x)
-  }
-  # Unique combined levels
-  levels <- as.character(unlist(lapply(dots, get_levels), recursive = FALSE))
-  collapse::funique(levels)
-}
 
-combine_factors <- function(...){
-  factors <- as_list_of(...)
-  if (length(factors) == 1){
-    return(factors[[1L]])
-  }
-  to_char <- function(x){
-    if (is.factor(x)) factor_as_character(x) else as.character(x)
-  }
-  combined_levels <- do.call(combine_levels, factors)
-  characters <- lapply(factors, to_char)
-
-  # Combine all factor elements (as character vectors)
-  factor_(
-    unlist(characters, recursive = FALSE), levels = combined_levels,
-    na_exclude = !any_na(combined_levels)
-  )
-}
-
-
+# Keeping this as other packages may use it
 df_add_cols <- function(data, cols){
   if (!(is.list(cols) && !is.null(names(cols)))){
     stop("cols must be a named list")
@@ -228,7 +166,7 @@ df_add_cols <- function(data, cols){
   out <- unclass(data)
   temp <- unclass(cols)
   for (col in names(temp)){
-    out[[col]] <- if (is.null(temp[[col]])) NULL else cheapr_recycle(temp[[col]], length = N)
+    out[[col]] <- if (is.null(temp[[col]])) NULL else cheapr_rep_len(temp[[col]], N)
   }
   class(out) <- class(data)
   out
@@ -236,27 +174,11 @@ df_add_cols <- function(data, cols){
 
 # unevaluated expression list
 exprs <- function(...){
-  as.list(substitute(alist(...)))[-1]
+  as.list(substitute(alist(...)))[-1L]
 }
 
 # Sort of the inverse of %||%
 `%!||%` <- function(x, y) if (x) NULL else y
-
-# Just a wrapper with a cheaper alternative to `c.factor()`
-# cheapr_c <- function(..., .check = TRUE){
-#   dots <- list(...)
-#   if (.check){
-#     for (vec in dots){
-#       if (is.factor(vec)){
-#         return(combine_factors(dots))
-#       }
-#       if (is.object(vec)){
-#         return(do.call(c, dots))
-#       }
-#     }
-#   }
-#   `attributes<-`(collapse::vec(dots), NULL)
-# }
 
 # Turn negative indices to positives
 neg_indices_to_pos <- function(exclude, n){
@@ -268,4 +190,19 @@ neg_indices_to_pos <- function(exclude, n){
       as.integer(exclude)
     )
   }
+}
+
+# Both below to be safely used in C++ code
+fast_match <- function(x, table, nomatch = NA_integer_){
+  collapse::fmatch(x, table, overid = 2L, nomatch = nomatch)
+}
+fast_unique <- function(x){
+  collapse::funique(x)
+}
+
+vec_setdiff <- function(x, y, unique = FALSE){
+  .Call(`_cheapr_cpp_setdiff`, x, y, unique)
+}
+vec_intersect <- function(x, y, unique = FALSE){
+  .Call(`_cheapr_cpp_intersect`, x, y, unique)
 }

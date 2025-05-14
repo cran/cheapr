@@ -62,9 +62,9 @@ void check_atomic(SEXP x){
 }
 
 bool implicit_na_coercion(SEXP x, SEXP target){
-  SEXP coerced = Rf_protect(coerce_vector(x, CHEAPR_TYPEOF(target)));
+  SEXP coerced = SHIELD(coerce_vector(x, CHEAPR_TYPEOF(target)));
   bool out = na_count(x, true) != na_count(coerced, true);
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 
@@ -77,14 +77,14 @@ R_xlen_t scalar_count(SEXP x, SEXP value, bool recursive){
   int NP = 0;
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
 
-  SEXP val_is_na = Rf_protect(cpp_is_na(value)); ++NP;
+  SEXP val_is_na = SHIELD(cpp_is_na(value)); ++NP;
   if (Rf_length(val_is_na) == 1 && LOGICAL(val_is_na)[0]){
     // Can't count NA > NA for example
     // if (op != 1){
-    //   Rf_unprotect(NP);
+    //   YIELD(NP);
     //   return 0;
     // } else {
-    Rf_unprotect(NP);
+    YIELD(NP);
     return na_count(x, recursive);
     // }
   }
@@ -95,7 +95,7 @@ R_xlen_t scalar_count(SEXP x, SEXP value, bool recursive){
                                                                \
 
 // Alternative that works for other equality operators
-// _IS_NA_ is a arg that accepts a function like cheapr_is_na_int
+// _IS_NA_ is a arg that accepts a function like is_na_int
 // for (R_xlen_t i = 0; i < n; ++i){
 //   count += (c_op(p_x[i], _val_) && !_IS_NA_(p_x[i]));
 // }
@@ -103,15 +103,15 @@ R_xlen_t scalar_count(SEXP x, SEXP value, bool recursive){
 
 switch ( CHEAPR_TYPEOF(x) ){
 case NILSXP: {
-  Rf_unprotect(NP);
+  YIELD(NP);
   return count;
 }
 case LGLSXP:
 case INTSXP: {
   if (implicit_na_coercion(value, x)) break;
-  Rf_protect(value = coerce_vector(value, INTSXP)); ++NP;
+  SHIELD(value = coerce_vector(value, INTSXP)); ++NP;
   int val = Rf_asInteger(value);
-  int *p_x = INTEGER(x);
+  const int *p_x = INTEGER(x);
   // int (*c_op)(int, int);
   // CHEAPR_OP_SWITCH;
   if (n_cores > 1){
@@ -125,9 +125,9 @@ case INTSXP: {
 }
 case REALSXP: {
   if (implicit_na_coercion(value, x)) break;
-  Rf_protect(value = coerce_vector(value, REALSXP)); ++NP;
+  SHIELD(value = coerce_vector(value, REALSXP)); ++NP;
   double val = Rf_asReal(value);
-  double *p_x = REAL(x);
+  const double *p_x = REAL(x);
   // int (*c_op)(double, double);
   // CHEAPR_OP_SWITCH;
   if (n_cores > 1){
@@ -142,10 +142,10 @@ case REALSXP: {
 }
 case CHEAPR_INT64SXP: {
   if (implicit_na_coercion(value, x)) break;
-  Rf_protect(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
-  long long int val = INTEGER64_PTR(value)[0];
-  long long int *p_x = INTEGER64_PTR(x);
-  // int (*c_op)(long long int, long long int);
+  SHIELD(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
+  int_fast64_t val = INTEGER64_PTR(value)[0];
+  const int_fast64_t *p_x = INTEGER64_PTR(x);
+  // int (*c_op)(int_fast64_t, int_fast64_t);
   // CHEAPR_OP_SWITCH;
   if (n_cores > 1){
 #pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
@@ -158,19 +158,12 @@ case CHEAPR_INT64SXP: {
 }
 case STRSXP: {
   if (implicit_na_coercion(value, x)) break;
-  Rf_protect(value = coerce_vector(value, STRSXP)); ++NP;
-  SEXP val = Rf_protect(Rf_asChar(value)); ++NP;
+  SHIELD(value = coerce_vector(value, STRSXP)); ++NP;
+  SEXP val = SHIELD(Rf_asChar(value)); ++NP;
   const SEXP *p_x = STRING_PTR_RO(x);
   // int (*c_op)(SEXP, SEXP);
   // CHEAPR_OP_SWITCH;
-
-  if (n_cores > 1){
-#pragma omp parallel for simd num_threads(n_cores) reduction(+:count)
-    CHEAPR_VAL_COUNT(val);
-  } else {
-#pragma omp for simd
-    CHEAPR_VAL_COUNT(val);
-  }
+  CHEAPR_VAL_COUNT(val);
   break;
 }
 case VECSXP: {
@@ -183,11 +176,11 @@ case VECSXP: {
 }
 }
 default: {
-  Rf_unprotect(NP);
+  YIELD(NP);
   Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
 }
 }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return count;
 }
 
@@ -232,7 +225,7 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   bool any_eq = false;
   bool eq = false;
 
-  SEXP out = Rf_protect(R_NilValue); ++NP;
+  SEXP out = SHIELD(R_NilValue); ++NP;
   switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
     break;
@@ -243,10 +236,10 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
     out = x;
     break;
   }
-    SEXP temp = Rf_protect(Rf_allocVector(INTSXP, 0)); ++NP;
+    SEXP temp = SHIELD(new_vec(INTSXP, 0)); ++NP;
     int *p_out = INTEGER(temp);
-    Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
-    Rf_protect(replace = coerce_vector(replace, CHEAPR_TYPEOF(x))); ++NP;
+    SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+    SHIELD(replace = coerce_vector(replace, CHEAPR_TYPEOF(x))); ++NP;
     int val = Rf_asInteger(value);
     int repl = Rf_asInteger(replace);
     int *p_x = INTEGER(x);
@@ -255,7 +248,7 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
       eq = p_x[i] == val;
       if (!any_eq && eq){
         any_eq = true;
-        out = Rf_protect(Rf_duplicate(x)); ++NP;
+        out = SHIELD(cpp_semi_copy(x)); ++NP;
         // Change where pointer is pointing to
         p_out = INTEGER(out);
       }
@@ -263,7 +256,7 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
     }
     // Make sure to return x if there were no values to replace
     if (!any_eq){
-      out = Rf_protect(x); ++NP;
+      out = SHIELD(x); ++NP;
     }
     break;
   }
@@ -272,9 +265,9 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
     out = x;
     break;
   }
-    Rf_protect(value = coerce_vector(value, REALSXP)); ++NP;
-    Rf_protect(replace = coerce_vector(replace, REALSXP)); ++NP;
-    SEXP temp = Rf_protect(Rf_allocVector(REALSXP, 0)); ++NP;
+    SHIELD(value = coerce_vector(value, REALSXP)); ++NP;
+    SHIELD(replace = coerce_vector(replace, REALSXP)); ++NP;
+    SEXP temp = SHIELD(new_vec(REALSXP, 0)); ++NP;
     double *p_out = REAL(temp);
     double val = Rf_asReal(value);
     double repl = Rf_asReal(replace);
@@ -284,7 +277,7 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
         eq = p_x[i] != p_x[i];
         if (!any_eq && eq){
           any_eq = true;
-          out = Rf_protect(Rf_duplicate(x)); ++NP;
+          out = SHIELD(cpp_semi_copy(x)); ++NP;
           // Change where pointer is pointing to
           p_out = REAL(out);
         }
@@ -292,14 +285,14 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
       }
       // Make sure to return x if there were no values to replace
       if (!any_eq){
-        out = Rf_protect(x); ++NP;
+        out = SHIELD(x); ++NP;
       }
     } else {
       for (R_xlen_t i = 0; i < n; ++i){
         eq = p_x[i] == val;
         if (!any_eq && eq){
           any_eq = true;
-          out = Rf_protect(Rf_duplicate(x)); ++NP;
+          out = SHIELD(cpp_semi_copy(x)); ++NP;
           // Change where pointer is pointing to
           p_out = REAL(out);
         }
@@ -307,7 +300,7 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
       }
       // Make sure to return x if there were no values to replace
       if (!any_eq){
-        out = Rf_protect(x); ++NP;
+        out = SHIELD(x); ++NP;
       }
     }
     break;
@@ -317,18 +310,18 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
     out = x;
     break;
   }
-    Rf_protect(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
-    Rf_protect(replace = coerce_vector(replace, CHEAPR_INT64SXP)); ++NP;
-    SEXP temp = Rf_protect(Rf_allocVector(REALSXP, 0)); ++NP;
-    long long *p_out = INTEGER64_PTR(temp);
-    long long val = INTEGER64_PTR(value)[0];
-    long long repl = INTEGER64_PTR(replace)[0];
-    long long *p_x = INTEGER64_PTR(x);
+    SHIELD(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
+    SHIELD(replace = coerce_vector(replace, CHEAPR_INT64SXP)); ++NP;
+    SEXP temp = SHIELD(new_vec(REALSXP, 0)); ++NP;
+    int_fast64_t *p_out = INTEGER64_PTR(temp);
+    int_fast64_t val = INTEGER64_PTR(value)[0];
+    int_fast64_t repl = INTEGER64_PTR(replace)[0];
+    int_fast64_t *p_x = INTEGER64_PTR(x);
     for (R_xlen_t i = 0; i < n; ++i){
       eq = p_x[i] == val;
       if (!any_eq && eq){
         any_eq = true;
-        out = Rf_protect(Rf_duplicate(x)); ++NP;
+        out = SHIELD(cpp_semi_copy(x)); ++NP;
         // Change where pointer is pointing to
         p_out = INTEGER64_PTR(out);
       }
@@ -336,7 +329,7 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
     }
     // Make sure to return x if there were no values to replace
     if (!any_eq){
-      out = Rf_protect(x); ++NP;
+      out = SHIELD(x); ++NP;
     }
     break;
   }
@@ -345,29 +338,29 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
     out = x;
     break;
   }
-    Rf_protect(value = coerce_vector(value, STRSXP)); ++NP;
-    Rf_protect(replace = coerce_vector(replace, STRSXP)); ++NP;
-    SEXP val = Rf_protect(Rf_asChar(value)); ++NP;
-    SEXP repl = Rf_protect(Rf_asChar(replace)); ++NP;
+    SHIELD(value = coerce_vector(value, STRSXP)); ++NP;
+    SHIELD(replace = coerce_vector(replace, STRSXP)); ++NP;
+    SEXP val = SHIELD(Rf_asChar(value)); ++NP;
+    SEXP repl = SHIELD(Rf_asChar(replace)); ++NP;
     const SEXP *p_x = STRING_PTR_RO(x);
 
     for (R_xlen_t i = 0; i < n; ++i){
       eq = p_x[i] == val;
       if (!any_eq && eq){
         any_eq = true;
-        out = Rf_protect(Rf_duplicate(x)); ++NP;
+        out = SHIELD(cpp_semi_copy(x)); ++NP;
       }
       if (eq) SET_STRING_ELT(out, i, repl);
     }
     // Make sure to return x if there were no values to replace
     if (!any_eq){
-      out = Rf_protect(x); ++NP;
+      out = SHIELD(x); ++NP;
     }
     break;
   }
   case VECSXP: {
     if (recursive){
-    out = Rf_protect(Rf_allocVector(VECSXP, n)); ++NP;
+    out = SHIELD(new_vec(VECSXP, n)); ++NP;
     for (R_xlen_t i = 0; i < n; ++i){
       // Initialise each element
       SET_VECTOR_ELT(out, i, VECTOR_ELT(x, i));
@@ -376,17 +369,16 @@ SEXP cpp_val_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
       SET_VECTOR_ELT(out, i, cpp_val_replace(VECTOR_ELT(out, i), value, replace, true));
     }
     // Copy attributes from x to y
-    SEXP attrs = Rf_protect(Rf_coerceVector(ATTRIB(x), VECSXP)); ++NP;
-    cpp_set_add_attributes(out, attrs, true);
+    SHALLOW_DUPLICATE_ATTRIB(out, x);
     break;
   }
   }
   default: {
-    Rf_unprotect(NP);
+    YIELD(NP);
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return out;
 }
 
@@ -406,7 +398,7 @@ SEXP cpp_val_set_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   if (ALTREP(x)){
     Rf_warning("Cannot update an ALTREP by reference, a copy has been made.\n\tEnsure the result is assigned to an object if used in further calculations");
   }
-  Rf_protect(x = altrep_materialise(x)); ++NP;
+  SHIELD(x = altrep_materialise(x)); ++NP;
 
   switch ( CHEAPR_TYPEOF(x) ){
   case NILSXP: {
@@ -415,8 +407,8 @@ SEXP cpp_val_set_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   case LGLSXP:
   case INTSXP: {
     if (implicit_na_coercion(value, x)) break;
-    Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
-    Rf_protect(replace = coerce_vector(replace, CHEAPR_TYPEOF(x))); ++NP;
+    SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+    SHIELD(replace = coerce_vector(replace, CHEAPR_TYPEOF(x))); ++NP;
     int val = Rf_asInteger(value);
     int repl = Rf_asInteger(replace);
     int *p_x = INTEGER(x);
@@ -429,8 +421,8 @@ SEXP cpp_val_set_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   }
   case REALSXP: {
     if (implicit_na_coercion(value, x)) break;
-    Rf_protect(value = coerce_vector(value, REALSXP)); ++NP;
-    Rf_protect(replace = coerce_vector(replace, REALSXP)); ++NP;
+    SHIELD(value = coerce_vector(value, REALSXP)); ++NP;
+    SHIELD(replace = coerce_vector(replace, REALSXP)); ++NP;
 
     double val = Rf_asReal(value);
     double repl = Rf_asReal(replace);
@@ -450,12 +442,12 @@ SEXP cpp_val_set_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   }
   case CHEAPR_INT64SXP: {
     if (implicit_na_coercion(value, x)) break;
-    Rf_protect(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
-    Rf_protect(replace = coerce_vector(replace, CHEAPR_INT64SXP)); ++NP;
+    SHIELD(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
+    SHIELD(replace = coerce_vector(replace, CHEAPR_INT64SXP)); ++NP;
 
-    long long val = INTEGER64_PTR(value)[0];
-    long long repl = INTEGER64_PTR(replace)[0];
-    long long *p_x = INTEGER64_PTR(x);
+    int_fast64_t val = INTEGER64_PTR(value)[0];
+    int_fast64_t repl = INTEGER64_PTR(replace)[0];
+    int_fast64_t *p_x = INTEGER64_PTR(x);
     OMP_FOR_SIMD
     for (R_xlen_t i = 0; i < n; ++i){
       if (p_x[i] == val) p_x[i] = repl;
@@ -464,10 +456,10 @@ SEXP cpp_val_set_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   }
   case STRSXP: {
     if (implicit_na_coercion(value, x)) break;
-    Rf_protect(value = coerce_vector(value, STRSXP)); ++NP;
-    Rf_protect(replace = coerce_vector(replace, STRSXP)); ++NP;
-    SEXP val = Rf_protect(Rf_asChar(value)); ++NP;
-    SEXP repl = Rf_protect(Rf_asChar(replace)); ++NP;
+    SHIELD(value = coerce_vector(value, STRSXP)); ++NP;
+    SHIELD(replace = coerce_vector(replace, STRSXP)); ++NP;
+    SEXP val = SHIELD(Rf_asChar(value)); ++NP;
+    SEXP repl = SHIELD(Rf_asChar(replace)); ++NP;
     const SEXP *p_x = STRING_PTR_RO(x);
 
     for (R_xlen_t i = 0; i < n; ++i){
@@ -486,11 +478,11 @@ SEXP cpp_val_set_replace(SEXP x, SEXP value, SEXP replace, bool recursive){
   }
   }
   default: {
-    Rf_unprotect(NP);
+    YIELD(NP);
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-  Rf_unprotect(NP);
+  YIELD(NP);
   return x;
 }
 
@@ -507,38 +499,38 @@ SEXP cpp_loc_set_replace(SEXP x, SEXP where, SEXP what){
   if (ALTREP(x)){
     Rf_warning("Cannot update an ALTREP by reference, a copy has been made.\n\tEnsure the result is assigned to an object if used in further calculations");
   }
-  Rf_protect(x = altrep_materialise(x));
+  SHIELD(x = altrep_materialise(x));
 
-  long long int xn = Rf_xlength(x);
+  int_fast64_t xn = Rf_xlength(x);
   int where_size = Rf_length(where);
   int what_size = Rf_length(what);
   if (what_size != 1 && where_size != what_size){
-    Rf_unprotect(1);
+    YIELD(1);
     Rf_error("`what` must be either length 1 or `length(where)`");
   }
-  long long int xi;
+  int_fast64_t xi;
 
 
-#define CHEAPR_REPLACE                                                                           \
-  if (what_size == 1){                                                                           \
-    for (int i = 0; i < where_size; ++i){                                                        \
-      xi = p_where[i];                                                                           \
+#define CHEAPR_REPLACE                                                                                      \
+  if (what_size == 1){                                                                                      \
+    for (int i = 0; i < where_size; ++i){                                                                   \
+      xi = p_where[i];                                                                                      \
       if (xi <= 0 || xi > xn){                                                                   \
-        Rf_unprotect(1);                                                                         \
-        Rf_error("where must be an integer vector of values between 1 and `length(x)`");         \
-      }                                                                                          \
-      p_x[xi - 1] = p_what[0];                                                                   \
-    }                                                                                            \
-  } else {                                                                                       \
-    for (int i = 0; i < where_size; ++i){                                                        \
-      xi = p_where[i];                                                                           \
+        YIELD(1);                                                                                           \
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");                    \
+      }                                                                                                     \
+      p_x[xi - 1] = p_what[0];                                                                              \
+    }                                                                                                       \
+  } else {                                                                                                  \
+    for (int i = 0; i < where_size; ++i){                                                                   \
+      xi = p_where[i];                                                                                      \
       if (xi <= 0 || xi > xn){                                                                   \
-        Rf_unprotect(1);                                                                         \
-        Rf_error("where must be an integer vector of values between 1 and `length(x)`");         \
-      }                                                                                          \
-      p_x[xi - 1] = p_what[i];                                                                   \
-    }                                                                                            \
-  }                                                                                              \
+        YIELD(1);                                                                                           \
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");                    \
+      }                                                                                                     \
+      p_x[xi - 1] = p_what[i];                                                                              \
+    }                                                                                                       \
+  }                                                                                                         \
 
 
 switch (TYPEOF(x)){
@@ -558,12 +550,108 @@ case REALSXP: {
   CHEAPR_REPLACE
   break;
 }
+case STRSXP: {
+  const SEXP *p_what = STRING_PTR_RO(what);
+
+  if (what_size == 1){
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_STRING_ELT(x, xi - 1, p_what[0]);
+    }
+  } else {
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_STRING_ELT(x, xi - 1, p_what[i]);
+    }
+  }
+  break;
+}
+case CPLXSXP: {
+  Rcomplex *p_what = COMPLEX(what);
+
+  if (what_size == 1){
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_COMPLEX_ELT(x, xi - 1, p_what[0]);
+    }
+  } else {
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_COMPLEX_ELT(x, xi - 1, p_what[i]);
+    }
+  }
+  break;
+}
+case RAWSXP: {
+  Rbyte *p_what = RAW(what);
+
+  if (what_size == 1){
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_RAW_ELT(x, xi - 1, p_what[0]);
+    }
+  } else {
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_RAW_ELT(x, xi - 1, p_what[i]);
+    }
+  }
+  break;
+}
+case VECSXP: {
+  const SEXP *p_what = VECTOR_PTR_RO(what);
+
+  if (what_size == 1){
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_VECTOR_ELT(x, xi - 1, p_what[0]);
+    }
+  } else {
+    for (int i = 0; i < where_size; ++i){
+      xi = p_where[i];
+      if (xi <= 0 || xi > xn){
+        YIELD(1);
+        Rf_error("where must be an integer vector of values between 1 and `length(x)`");
+      }
+      SET_VECTOR_ELT(x, xi - 1, p_what[i]);
+    }
+  }
+  break;
+}
 default: {
-  Rf_unprotect(1);
+  YIELD(1);
   Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
 }
 }
-  Rf_unprotect(1);
+  YIELD(1);
   return x;
 }
 
@@ -579,10 +667,10 @@ default: {
 //   R_xlen_t k = 0;
 //
 //   SEXP out;
-//   SEXP temp = Rf_protect(R_NilValue); ++NP;
+//   SEXP temp = SHIELD(R_NilValue); ++NP;
 //   switch ( CHEAPR_TYPEOF(x) ){
 //   case NILSXP: {
-//     out = Rf_protect(R_NilValue); ++NP;
+//     out = SHIELD(R_NilValue); ++NP;
 //     break;
 //   }
 //   case LGLSXP:
@@ -591,8 +679,8 @@ default: {
 //     out = x;
 //     break;
 //   }
-//     temp = Rf_protect(Rf_allocVector(TYPEOF(x), n)); ++NP;
-//     Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+//     temp = SHIELD(new_vec(TYPEOF(x), n)); ++NP;
+//     SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
 //     int val = Rf_asInteger(value);
 //     int *p_x = INTEGER(x);
 //     int *p_temp = INTEGER(temp);
@@ -605,8 +693,8 @@ default: {
 //         p_temp[k++] = p_x[i];
 //       }
 //     }
-//     out = Rf_protect(Rf_xlengthgets(temp, n - n_rm)); ++NP;
-//     cpp_copy_attributes(x, out, false);
+//     out = SHIELD(Rf_xlengthgets(temp, n - n_rm)); ++NP;
+//     cpp_set_add_attributes(out, ATTRIB(x), false);
 //     break;
 //   }
 //   case REALSXP: {
@@ -614,15 +702,15 @@ default: {
 //     out = x;
 //     break;
 //   }
-//     temp = Rf_protect(Rf_allocVector(TYPEOF(x), n)); ++NP;
-//     Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+//     temp = SHIELD(new_vec(TYPEOF(x), n)); ++NP;
+//     SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
 //     double val = Rf_asReal(value);
 //     double *p_x = REAL(x);
 //     double *p_temp = REAL(temp);
 //
 //     if (cpp_any_na(value, true)){
 //       for (R_xlen_t i = 0; i < n; ++i){
-//         eq = cheapr_is_na_dbl(p_x[i]);
+//         eq = is_na_dbl(p_x[i]);
 //         if (eq){
 //           ++n_rm;
 //         } else {
@@ -639,8 +727,8 @@ default: {
 //         }
 //       }
 //     }
-//     out = Rf_protect(Rf_xlengthgets(temp, n - n_rm)); ++NP;
-//     cpp_copy_attributes(x, out, false);
+//     out = SHIELD(Rf_xlengthgets(temp, n - n_rm)); ++NP;
+//     cpp_set_add_attributes(out, ATTRIB(x), false);
 //     break;
 //   }
 //   case CHEAPR_INT64SXP: {
@@ -648,11 +736,11 @@ default: {
 //     out = x;
 //     break;
 //   }
-//     temp = Rf_protect(Rf_allocVector(TYPEOF(x), n)); ++NP;
-//     Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
-//     long long int val = INTEGER64_PTR(value)[0];
-//     long long int *p_x = INTEGER64_PTR(x);
-//     long long int *p_temp = INTEGER64_PTR(temp);
+//     temp = SHIELD(new_vec(TYPEOF(x), n)); ++NP;
+//     SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+//     int_fast64_t val = INTEGER64_PTR(value)[0];
+//     int_fast64_t *p_x = INTEGER64_PTR(x);
+//     int_fast64_t *p_temp = INTEGER64_PTR(temp);
 //
 //     for (R_xlen_t i = 0; i < n; ++i){
 //       eq = p_x[i] == val;
@@ -662,8 +750,8 @@ default: {
 //         p_temp[k++] = p_x[i];
 //       }
 //     }
-//     out = Rf_protect(Rf_xlengthgets(temp, n - n_rm)); ++NP;
-//     cpp_copy_attributes(x, out, false);
+//     out = SHIELD(Rf_xlengthgets(temp, n - n_rm)); ++NP;
+//     cpp_set_add_attributes(out, ATTRIB(x), false);
 //     break;
 //   }
 //   case STRSXP: {
@@ -671,9 +759,9 @@ default: {
 //     out = x;
 //     break;
 //   }
-//     temp = Rf_protect(Rf_allocVector(TYPEOF(x), n)); ++NP;
-//     Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
-//     SEXP val = Rf_protect(Rf_asChar(value)); ++NP;
+//     temp = SHIELD(new_vec(TYPEOF(x), n)); ++NP;
+//     SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+//     SEXP val = SHIELD(Rf_asChar(value)); ++NP;
 //     const SEXP *p_x = STRING_PTR_RO(x);
 //
 //     for (R_xlen_t i = 0; i < n; ++i){
@@ -684,16 +772,16 @@ default: {
 //         SET_STRING_ELT(temp, k++, p_x[i]);
 //       }
 //     }
-//     out = Rf_protect(Rf_xlengthgets(temp, n - n_rm)); ++NP;
-//     cpp_copy_attributes(x, out, false);
+//     out = SHIELD(Rf_xlengthgets(temp, n - n_rm)); ++NP;
+//     cpp_set_add_attributes(out, ATTRIB(x), false);
 //     break;
 //   }
 //   default: {
-//     Rf_unprotect(NP);
+//     YIELD(NP);
 //     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
 //   }
 //   }
-//   Rf_unprotect(NP);
+//   YIELD(NP);
 //   return out;
 // }
 
@@ -708,9 +796,10 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
   if (n_vals == 0){
     return x;
   } else if (n_vals == Rf_xlength(x)){
-    SEXP out = Rf_protect(Rf_allocVector(TYPEOF(x), 0)); ++NP;
-    cpp_copy_attributes(x, out, false);
-    Rf_unprotect(NP);
+    SEXP out = SHIELD(new_vec(TYPEOF(x), 0)); ++NP;
+
+    cpp_set_add_attributes(out, ATTRIB(x), false);
+    YIELD(NP);
     return out;
     return cheapr_sset(x, 0);
   } else {
@@ -722,7 +811,7 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
     SEXP out;
     switch ( CHEAPR_TYPEOF(x) ){
     case NILSXP: {
-      out = Rf_protect(R_NilValue); ++NP;
+      out = SHIELD(R_NilValue); ++NP;
       break;
     }
     case LGLSXP:
@@ -731,8 +820,8 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
       out = x;
       break;
     }
-      out = Rf_protect(Rf_allocVector(TYPEOF(x), n_keep)); ++NP;
-      Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+      out = SHIELD(new_vec(TYPEOF(x), n_keep)); ++NP;
+      SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
       int val = Rf_asInteger(value);
       int *p_x = INTEGER(x);
       int *p_out = INTEGER(out);
@@ -743,7 +832,7 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
           p_out[k++] = p_x[i];
         }
       }
-      cpp_copy_attributes(x, out, false);
+      cpp_set_add_attributes(out, ATTRIB(x), false);
       break;
     }
     case REALSXP: {
@@ -751,15 +840,15 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
       out = x;
       break;
     }
-      out = Rf_protect(Rf_allocVector(TYPEOF(x), n_keep)); ++NP;
-      Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+      out = SHIELD(new_vec(TYPEOF(x), n_keep)); ++NP;
+      SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
       double val = Rf_asReal(value);
       double *p_x = REAL(x);
       double *p_out = REAL(out);
 
       if (cpp_any_na(value, true)){
         for (R_xlen_t i = 0; i < n; ++i){
-          eq = cheapr_is_na_dbl(p_x[i]);
+          eq = is_na_dbl(p_x[i]);
           if (!eq){
             p_out[k++] = p_x[i];
           }
@@ -772,7 +861,7 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
           }
         }
       }
-      cpp_copy_attributes(x, out, false);
+      cpp_set_add_attributes(out, ATTRIB(x), false);
       break;
     }
     case CHEAPR_INT64SXP: {
@@ -780,11 +869,11 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
       out = x;
       break;
     }
-      out = Rf_protect(Rf_allocVector(TYPEOF(x), n_keep)); ++NP;
-      Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
-      long long int val = INTEGER64_PTR(value)[0];
-      long long int *p_x = INTEGER64_PTR(x);
-      long long int *p_out = INTEGER64_PTR(out);
+      out = SHIELD(new_vec(TYPEOF(x), n_keep)); ++NP;
+      SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+      int_fast64_t val = INTEGER64_PTR(value)[0];
+      int_fast64_t *p_x = INTEGER64_PTR(x);
+      int_fast64_t *p_out = INTEGER64_PTR(out);
 
       for (R_xlen_t i = 0; i < n; ++i){
         eq = p_x[i] == val;
@@ -792,7 +881,7 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
           p_out[k++] = p_x[i];
         }
       }
-      cpp_copy_attributes(x, out, false);
+      cpp_set_add_attributes(out, ATTRIB(x), false);
       break;
     }
     case STRSXP: {
@@ -800,9 +889,9 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
       out = x;
       break;
     }
-      out = Rf_protect(Rf_allocVector(TYPEOF(x), n_keep)); ++NP;
-      Rf_protect(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
-      SEXP val = Rf_protect(Rf_asChar(value)); ++NP;
+      out = SHIELD(new_vec(TYPEOF(x), n_keep)); ++NP;
+      SHIELD(value = coerce_vector(value, CHEAPR_TYPEOF(x))); ++NP;
+      SEXP val = SHIELD(Rf_asChar(value)); ++NP;
       const SEXP *p_x = STRING_PTR_RO(x);
 
       for (R_xlen_t i = 0; i < n; ++i){
@@ -811,17 +900,17 @@ SEXP cpp_val_remove(SEXP x, SEXP value){
           SET_STRING_ELT(out, k++, p_x[i]);
         }
       }
-      cpp_copy_attributes(x, out, false);
+      cpp_set_add_attributes(out, ATTRIB(x), false);
       break;
     }
     default: {
-      SEXP sexp_n_vals = Rf_protect(Rf_ScalarReal(n_vals)); ++NP;
-      SEXP val_locs = Rf_protect(cpp_val_find(x, value, true, sexp_n_vals)); ++NP;
-      out = Rf_protect(cheapr_sset(x, val_locs)); ++NP;
+      SEXP sexp_n_vals = SHIELD(Rf_ScalarReal(n_vals)); ++NP;
+      SEXP val_locs = SHIELD(cpp_val_find(x, value, true, sexp_n_vals)); ++NP;
+      out = SHIELD(cheapr_sset(x, val_locs)); ++NP;
       break;
     }
     }
-    Rf_unprotect(NP);
+    YIELD(NP);
     return out;
   }
 }

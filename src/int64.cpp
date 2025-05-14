@@ -9,18 +9,17 @@ SEXP cpp_int64_to_int(SEXP x){
   }
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out = Rf_protect(Rf_allocVector(INTSXP, n));
-  int *p_out = INTEGER(out);
+  SEXP out = SHIELD(new_vec(INTSXP, n));
+  int* RESTRICT p_out = INTEGER(out);
 
-  long long *p_x = INTEGER64_PTR(x);
+  const int_fast64_t *p_x = INTEGER64_PTR(x);
 
-  int repl;
-  long long int int_max = integer_max_;
+  int_fast64_t int_max = integer_max_;
+
   for (R_xlen_t i = 0; i < n; ++i){
-    repl = cheapr_is_na_int64(p_x[i]) || std::llabs(p_x[i]) > int_max ? NA_INTEGER : p_x[i];
-    p_out[i] = repl;
+    p_out[i] = is_na_int64(p_x[i]) || std::llabs(p_x[i]) > int_max ? NA_INTEGER : p_x[i];
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 
@@ -33,17 +32,17 @@ SEXP cpp_int64_to_double(SEXP x){
   }
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out = Rf_protect(Rf_allocVector(REALSXP, n));
-  double *p_out = REAL(out);
+  SEXP out = SHIELD(new_vec(REALSXP, n));
+  double* RESTRICT p_out = REAL(out);
 
-  long long *p_x = INTEGER64_PTR(x);
+  const int_fast64_t *p_x = INTEGER64_PTR(x);
 
   double repl;
   for (R_xlen_t i = 0; i < n; ++i){
-    repl = cheapr_is_na_int64(p_x[i]) ? NA_REAL : p_x[i];
+    repl = is_na_int64(p_x[i]) ? NA_REAL : p_x[i];
     p_out[i] = repl;
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 
@@ -59,11 +58,11 @@ bool cpp_all_integerable(SEXP x, int shift = 0){
     break;
   }
   case CHEAPR_INT64SXP: {
-    long long int *p_x = INTEGER64_PTR(x);
-    long long int int_max = integer_max_;
-    long long int shift_ = shift;
+    const int_fast64_t *p_x = INTEGER64_PTR(x);
+    int_fast64_t int_max = integer_max_;
+    int_fast64_t shift_ = shift;
     for (R_xlen_t i = 0; i < n; ++i){
-      if (!cheapr_is_na_int64(p_x[i]) && ( (std::llabs(p_x[i]) + shift_) > int_max )){
+      if (!is_na_int64(p_x[i]) && ( (std::llabs(p_x[i]) + shift_) > int_max )){
         out = false;
         break;
       }
@@ -71,11 +70,11 @@ bool cpp_all_integerable(SEXP x, int shift = 0){
     break;
   }
   case REALSXP: {
-    double *p_x = REAL(x);
+    const double *p_x = REAL(x);
     double int_max = integer_max_;
     double shift_ = shift;
     for (R_xlen_t i = 0; i < n; ++i){
-      if (!cheapr_is_na_dbl(p_x[i]) && ( (std::fabs(p_x[i]) + shift_) > int_max )){
+      if (!is_na_dbl(p_x[i]) && ( (std::fabs(p_x[i]) + shift_) > int_max )){
         out = false;
         break;
       }
@@ -109,46 +108,46 @@ SEXP cpp_numeric_to_int64(SEXP x){
   R_xlen_t n = Rf_xlength(x);
 
   SEXP out;
-  long long int repl;
+  int_fast64_t repl;
 
   switch (CHEAPR_TYPEOF(x)){
   case INTSXP: {
     int *p_x = INTEGER(x);
-    out = Rf_protect(Rf_allocVector(REALSXP, n));
-    long long *p_out = INTEGER64_PTR(out);
+    out = SHIELD(new_vec(REALSXP, n));
+    int_fast64_t *p_out = INTEGER64_PTR(out);
     for (R_xlen_t i = 0; i < n; ++i){
-      repl = cheapr_is_na_int(p_x[i]) ? NA_INTEGER64 : p_x[i];
+      repl = is_na_int(p_x[i]) ? NA_INTEGER64 : p_x[i];
       p_out[i] = repl;
     }
-    Rf_classgets(out, Rf_mkString("integer64"));
+    Rf_classgets(out, make_utf8_str("integer64"));
     break;
   }
   case CHEAPR_INT64SXP: {
-    out = Rf_protect(x);
+    out = SHIELD(x);
     break;
   }
   case REALSXP: {
     double *p_x = REAL(x);
-    out = Rf_protect(Rf_allocVector(REALSXP, n));
-    long long *p_out = INTEGER64_PTR(out);
+    out = SHIELD(new_vec(REALSXP, n));
+    int_fast64_t *p_out = INTEGER64_PTR(out);
     double temp;
     for (R_xlen_t i = 0; i < n; ++i){
       temp = p_x[i];
-      if (cheapr_is_na_dbl(temp) || (temp == R_PosInf) || temp == R_NegInf){
+      if (is_na_dbl(temp) || temp == R_PosInf || temp == R_NegInf){
         repl = NA_INTEGER64;
       } else {
         repl = temp;
       }
       p_out[i] = repl;
     }
-    Rf_classgets(out, Rf_mkString("integer64"));
+    Rf_classgets(out, make_utf8_str("integer64"));
     break;
   }
   default: {
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
 
@@ -177,45 +176,45 @@ SEXP cpp_format_numeric_as_int64(SEXP x){
 
   switch (CHEAPR_TYPEOF(x)){
   case INTSXP: {
-    out = Rf_protect(Rf_allocVector(STRSXP, n));
+    out = SHIELD(new_vec(STRSXP, n));
     int *p_x = INTEGER(x);
 
     for (R_xlen_t i = 0; i < n; ++i){
-      if (cheapr_is_na_int(p_x[i])){
+      if (is_na_int(p_x[i])){
         SET_STRING_ELT(out, i, NA_STRING);
       } else {
-        long long temp = p_x[i];
+        int_fast64_t temp = p_x[i];
         s = string_format("%lld", temp);
-        SET_STRING_ELT(out, i, Rf_mkChar(s.c_str()));
+        SET_STRING_ELT(out, i, make_utf8_char(s.c_str()));
       }
     }
     break;
   }
   case CHEAPR_INT64SXP: {
-    out = Rf_protect(Rf_allocVector(STRSXP, n));
-    long long *p_x = INTEGER64_PTR(x);
+    out = SHIELD(new_vec(STRSXP, n));
+    int_fast64_t *p_x = INTEGER64_PTR(x);
 
     for (R_xlen_t i = 0; i < n; ++i){
-      if (cheapr_is_na_int64(p_x[i])){
+      if (is_na_int64(p_x[i])){
         SET_STRING_ELT(out, i, NA_STRING);
       } else {
-        long long temp = p_x[i];
+        int_fast64_t temp = p_x[i];
         s = string_format("%lld", temp);
-        SET_STRING_ELT(out, i, Rf_mkChar(s.c_str()));
+        SET_STRING_ELT(out, i, make_utf8_char(s.c_str()));
       }
     }
     break;
   }
   case REALSXP: {
-    out = Rf_protect(Rf_allocVector(STRSXP, n));
+    out = SHIELD(new_vec(STRSXP, n));
     double *p_x = REAL(x);
     for (R_xlen_t i = 0; i < n; ++i){
-      if (cheapr_is_na_dbl(p_x[i])){
+      if (is_na_dbl(p_x[i])){
         SET_STRING_ELT(out, i, NA_STRING);
       } else {
-        long long temp = p_x[i];
+        int_fast64_t temp = p_x[i];
         s = string_format("%lld", temp);
-        SET_STRING_ELT(out, i, Rf_mkChar(s.c_str()));
+        SET_STRING_ELT(out, i, make_utf8_char(s.c_str()));
       }
     }
     break;
@@ -224,6 +223,6 @@ SEXP cpp_format_numeric_as_int64(SEXP x){
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-  Rf_unprotect(1);
+  YIELD(1);
   return out;
 }
