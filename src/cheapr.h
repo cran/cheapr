@@ -18,7 +18,7 @@
 #define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
 #endif
 #ifndef INTEGER64_PTR
-#define INTEGER64_PTR(x) ((int_fast64_t*) REAL(x))
+#define INTEGER64_PTR(x) ((int64_t*) REAL(x))
 #endif
 
 #ifdef _OPENMP
@@ -38,16 +38,18 @@
 #define OMP_PARALLEL_FOR_SIMD
 #endif
 
+// Not always guaranteed to be 32-bits
 #ifndef integer_max_
 #define integer_max_ std::numeric_limits<int>::max()
 #endif
 
+// Guaranteed to be 64-bits
 #ifndef integer64_max_
-#define integer64_max_ std::numeric_limits<int_fast64_t>::max()
+#define integer64_max_ std::numeric_limits<int64_t>::max()
 #endif
 
 #ifndef NA_INTEGER64
-#define NA_INTEGER64 std::numeric_limits<int_fast64_t>::min()
+#define NA_INTEGER64 std::numeric_limits<int64_t>::min()
 #endif
 
 
@@ -83,10 +85,10 @@
 
 
 #ifndef CHEAPR_INT_TO_INT64
-#define CHEAPR_INT_TO_INT64(x) ((int_fast64_t) (x == NA_INTEGER ? NA_INTEGER64 : x))
+#define CHEAPR_INT_TO_INT64(x) ((int64_t) (x == NA_INTEGER ? NA_INTEGER64 : x))
 #endif
 #ifndef CHEAPR_DBL_TO_INT64
-#define CHEAPR_DBL_TO_INT64(x) ((int_fast64_t) (x != x ? NA_INTEGER64 : x))
+#define CHEAPR_DBL_TO_INT64(x) ((int64_t) (x != x ? NA_INTEGER64 : x))
 #endif
 #ifndef CHEAPR_INT64_TO_INT
 #define CHEAPR_INT64_TO_INT(x) ((int) (x == NA_INTEGER64 ? NA_INTEGER : x))
@@ -142,7 +144,6 @@ SEXP cpp_set_rm_attributes(SEXP x);
 SEXP coerce_vector(SEXP source, SEXPTYPE type);
 bool implicit_na_coercion(SEXP x, SEXP target);
 SEXP cpp_val_find(SEXP x, SEXP value, bool invert, SEXP n_values);
-double round_nearest_even(double x);
 SEXP cpp_set_divide(SEXP x, SEXP y);
 SEXP cpp_val_remove(SEXP x, SEXP value);
 SEXP cpp_seq_len(R_xlen_t n);
@@ -173,7 +174,7 @@ SEXP get_ptype(SEXP x);
 SEXP get_list_element(SEXP list, SEXP str);
 SEXP list_c2(SEXP x, SEXP y);
 SEXP c2(SEXP x, SEXP y);
-SEXP reconstruct(SEXP x, SEXP source, bool shallow_copy);
+SEXP rebuild(SEXP x, SEXP source, bool shallow_copy);
 SEXP cpp_df_assign_cols(SEXP x, SEXP cols);
 SEXP cpp_df_col_c(SEXP x, bool recycle, bool name_repair);
 SEXP cpp_list_assign(SEXP x, SEXP values);
@@ -185,6 +186,7 @@ SEXP cpp_na_init(SEXP x, int n);
 SEXP new_list(R_xlen_t length, SEXP default_value);
 void set_list_as_df(SEXP x);
 SEXP cpp_semi_copy(SEXP x);
+void clear_attributes(SEXP x);
 
 inline const char* utf8_char(SEXP x){
   return Rf_translateCharUTF8(x);
@@ -259,6 +261,14 @@ inline bool is_simple_vec(SEXP x){
   return (is_simple_atomic_vec(x) || is_bare_list(x));
 }
 
+inline bool is_simple_atomic_vec2(SEXP x){
+  return is_simple_atomic_vec(x) || is_int64(x);
+}
+
+inline bool is_simple_vec2(SEXP x){
+  return is_simple_vec(x) || is_int64(x);
+}
+
 // Because Rf_ScalarLogical sometimes crashes R?.. Need to look into this
 inline SEXP scalar_lgl(bool x){
   SEXP out = SHIELD(new_vec(LGLSXP, 1));
@@ -292,6 +302,10 @@ inline SEXP get_names(SEXP x){
   return Rf_getAttrib(x, R_NamesSymbol);
 }
 
+inline double round_nearest_even(double x){
+  return x - std::remainder(x, 1.0);
+}
+
 inline cpp11::function cheapr_sset = cpp11::package("cheapr")["sset"];
 inline cpp11::function base_sset = cpp11::package("base")["["];
 inline cpp11::function cheapr_is_na = cpp11::package("cheapr")["is_na"];
@@ -303,7 +317,7 @@ inline cpp11::function base_as_character = cpp11::package("base")["as.character"
 inline cpp11::function base_paste0 = cpp11::package("base")["paste0"];
 inline cpp11::function cheapr_fast_match = cpp11::package("cheapr")["fast_match"];
 inline cpp11::function cheapr_fast_unique = cpp11::package("cheapr")["fast_unique"];
-inline cpp11::function cheapr_reconstruct = cpp11::package("cheapr")["reconstruct"];
+inline cpp11::function cheapr_rebuild = cpp11::package("cheapr")["rebuild"];
 
 inline bool address_equal(SEXP x, SEXP y){
   return r_address(x) == r_address(y);

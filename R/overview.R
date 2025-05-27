@@ -640,10 +640,3 @@ pretty_round <- function(x, decimal_digits = 2, signif_digits = 2, threshold = 1
   }
   x
 }
-# ts_growth_rate_per_period <- function(x){
-#   time <- as.vector(stats::time(x))
-#   freq <- stats::frequency(x)
-#   a <- utils::head(x, n = 1)
-#   b <- utils::tail(x, n = 1)
-#   cpp_growth_rate(as.double(a), as.double(b), length(time) / freq)
-# }

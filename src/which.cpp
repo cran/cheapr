@@ -5,15 +5,15 @@
 
 // Count the number of true values
 
-R_xlen_t count_true(const int* RESTRICT px, R_xlen_t n){
-  R_xlen_t size = 0;
+R_xlen_t count_true(const int* px, uint_fast64_t n){
+  uint_fast64_t size = 0;
   if (n >= CHEAPR_OMP_THRESHOLD){
 #pragma omp parallel for simd num_threads(num_cores()) reduction(+:size)
-    for (R_xlen_t j = 0; j < n; ++j) size += (px[j] == TRUE);
+    for (uint_fast64_t j = 0; j != n; ++j) size += (px[j] == 1);
     return size;
   } else {
     OMP_FOR_SIMD
-    for (R_xlen_t j = 0; j < n; ++j) size += (px[j] == TRUE);
+    for (uint_fast64_t j = 0; j != n; ++j) size += (px[j] == 1);
     return size;
   }
 }
@@ -33,7 +33,7 @@ while (whichi < out_size){                                     \
 [[cpp11::register]]
 SEXP cpp_which_(SEXP x, bool invert){
   R_xlen_t n = Rf_xlength(x);
-  const int *p_x = LOGICAL(x);
+  const int *p_x = LOGICAL_RO(x);
   bool is_long = (n > integer_max_);
   if (invert){
     if (is_long){
@@ -82,7 +82,7 @@ SEXP cpp_which_(SEXP x, bool invert){
 
 [[cpp11::register]]
 SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
-  int NP = 0;
+  int32_t NP = 0;
   R_xlen_t n = Rf_xlength(x);
   bool is_long = (n > integer_max_);
   if (Rf_length(value) != 1){
@@ -164,8 +164,8 @@ SEXP cpp_which_val(SEXP x, SEXP value, bool invert){
   case CHEAPR_INT64SXP: {
     SEXP out = SHIELD(new_vec(is_long ? REALSXP : INTSXP, out_size)); ++NP;
     SHIELD(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
-    int_fast64_t val = INTEGER64_PTR(value)[0];
-    const int_fast64_t *p_x = INTEGER64_PTR(x);
+    int64_t val = INTEGER64_PTR(value)[0];
+    const int64_t *p_x = INTEGER64_PTR(x);
     if (is_long){
       double* RESTRICT p_out = REAL(out);
       if (invert){
@@ -250,7 +250,7 @@ SEXP cpp_which_na(SEXP x){
   }
   case CHEAPR_INT64SXP: {
     R_xlen_t count = na_count(x, true);
-    const int_fast64_t *p_x = INTEGER64_PTR(x);
+    const int64_t *p_x = INTEGER64_PTR(x);
     if (is_short){
       int out_size = count;
       SEXP out = SHIELD(new_vec(INTSXP, out_size));
@@ -410,7 +410,7 @@ SEXP cpp_which_not_na(SEXP x){
   }
   case CHEAPR_INT64SXP: {
     R_xlen_t count = na_count(x, true);
-    const int_fast64_t *p_x = INTEGER64_PTR(x);
+    const int64_t *p_x = INTEGER64_PTR(x);
     if (is_short){
       int out_size = n - count;
       SEXP out = SHIELD(new_vec(INTSXP, out_size));
@@ -634,7 +634,7 @@ SEXP cpp_lgl_locs(SEXP x, R_xlen_t n_true, R_xlen_t n_false,
 
 // like cpp_which_val but an optional n_values arg to skip counting
 SEXP cpp_val_find(SEXP x, SEXP value, bool invert, SEXP n_values){
-  int NP = 0;
+  int32_t NP = 0;
   R_xlen_t n = Rf_xlength(x);
   bool is_long = (n > integer_max_);
   if (Rf_length(value) != 1){
@@ -735,8 +735,8 @@ SEXP cpp_val_find(SEXP x, SEXP value, bool invert, SEXP n_values){
     SEXP out = SHIELD(new_vec(is_long ? REALSXP : INTSXP, out_size));
     ++NP;
     SHIELD(value = coerce_vector(value, CHEAPR_INT64SXP)); ++NP;
-    int_fast64_t val = INTEGER64_PTR(value)[0];
-    int_fast64_t *p_x = INTEGER64_PTR(x);
+    int64_t val = INTEGER64_PTR(value)[0];
+    int64_t *p_x = INTEGER64_PTR(x);
     if (is_long){
       double *p_out = REAL(out);
       if (invert){

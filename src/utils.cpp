@@ -1,13 +1,11 @@
+#include <vector>
 #include "cheapr.h"
+#include <R.h> // R_Calloc
 
 // Miscellaneous functions
 // Author: Nick Christofides
 
 static SEXP CHEAPR_CORES = NULL;
-
-// void symbols_init(DllInfo* dll){
-//   CHEAPR_CORES = Rf_install("cheapr.cores");
-// }
 
 [[cpp11::register]]
 SEXP cpp_is_simple_atomic_vec(SEXP x){
@@ -192,53 +190,11 @@ SEXP cpp_semi_copy(SEXP x){
     // So I don't use it for non-ALTREP atomic vectors
 
     SEXP out = SHIELD(Rf_shallow_duplicate(x));
-    cpp_set_rm_attributes(out);
+    clear_attributes(out);
     SHIELD(out = Rf_duplicate(out));
     SHALLOW_DUPLICATE_ATTRIB(out, x);
     YIELD(2);
     return out;
-  }
-}
-
-// SEXP cpp_semi_copy(SEXP x){
-//   SEXP attrs = ATTRIB(x);
-//   if (is_null(attrs)){
-//     return Rf_duplicate(x);
-//   }
-//   SEXP out = SHIELD(Rf_shallow_duplicate(x));
-//   cpp_set_rm_attributes(out);
-//   SHIELD(out = Rf_duplicate(out));
-//   SHALLOW_DUPLICATE_ATTRIB(out, x);
-//   // SHIELD(attrs = Rf_shallow_duplicate(attrs));
-//   // cpp_set_add_attributes(out, attrs, false);
-//   YIELD(2);
-//   return out;
-// }
-
-// The below causes strange issues
-
-// SEXP cpp_semi_copy(SEXP x){
-//   SEXP attrs = ATTRIB(x);
-//   if (is_null(attrs)){
-//     return Rf_duplicate(x);
-//   }
-//   cpp_set_rm_attributes(x);
-//   SEXP out = SHIELD(Rf_duplicate(x));
-//   SEXP new_attrs = SHIELD(Rf_shallow_duplicate(attrs));
-//
-//   // Re-add attributes back to x
-//   cpp_set_add_attributes(x, attrs, false);
-//   cpp_set_add_attributes(out, new_attrs, false);
-//
-//   YIELD(2);
-//   return out;
-// }
-
-void rm_attrs(SEXP x){
-  SEXP current = ATTRIB(x);
-  while (current != R_NilValue){
-    Rf_setAttrib(x, TAG(current), R_NilValue);
-    current = CDR(current);
   }
 }
 
@@ -263,7 +219,7 @@ double cpp_sum(SEXP x){
   }
   case CHEAPR_INT64SXP: {
 
-    const int_fast64_t *p_x = INTEGER64_PTR(x);
+    const int64_t *p_x = INTEGER64_PTR(x);
 
     OMP_FOR_SIMD
     for (R_xlen_t i = 0; i < n; ++i){
@@ -306,8 +262,8 @@ double cpp_min(SEXP x){
 
     if (n == 0) return R_PosInf;
 
-    int_fast64_t *p_x = INTEGER64_PTR(x);
-    int_fast64_t out = integer64_max_;
+    int64_t *p_x = INTEGER64_PTR(x);
+    int64_t out = integer64_max_;
 
     OMP_FOR_SIMD
     for (R_xlen_t i = 0; i < n; ++i){
@@ -346,19 +302,6 @@ double var_sum_squared_diff(SEXP x, double mu){
 
     case INTSXP: {
       const int *p_x = INTEGER(x);
-      // if (std::abs(mu - std::round(mu)) < std::numeric_limits<double>::epsilon()){
-      //   int_fast64_t temp = 0;
-      //   int_fast64_t temp2;
-      //   int_fast64_t llmu = mu;
-      //   int_fast64_t temp1;
-      //   for (R_xlen_t i = 0; i < n; ++i){
-      //     if (is_na_int(p_x[i])) continue;
-      //     temp1 = p_x[i];
-      //     temp2 = std::pow(temp1 - llmu, 2);
-      //     temp += temp2;
-      //   }
-      //   out = temp;
-      // } else {
       for (R_xlen_t i = 0; i < n; ++i){
         if (is_na_int(p_x[i])) continue;
         out += std::pow(p_x[i] - mu, 2);
@@ -491,7 +434,7 @@ SEXP cpp_bin(SEXP x, SEXP breaks, bool codes, bool right,
 
 [[cpp11::register]]
 SEXP cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
-  int NP = 0; // count num protections
+  int32_t NP = 0; // count num protections
   if (TYPEOF(condition) != LGLSXP){
     Rf_error("condition must be a logical vector");
   }
@@ -726,35 +669,6 @@ SEXP cpp_lgl_count(SEXP x){
   return out;
 }
 
-// Essentially `x & y` but updates x by reference
-
-// SEXP cpp_set_and(SEXP x, SEXP y){
-//   R_xlen_t xn = Rf_xlength(x);
-//   R_xlen_t yn = Rf_xlength(y);
-//
-//   R_xlen_t n = xn == 0 || yn == 0 ? 0 : xn;
-//
-//   R_xlen_t i, yi;
-//
-//   int *p_x = LOGICAL(x);
-//   int *p_y = LOGICAL(y);
-//
-//
-//   for (i = yi = 0; i < n; yi = (++yi == yn) ? 0 : yi, ++i){
-//
-//     if (p_x[i] != FALSE){
-//       if (p_y[yi] == FALSE){
-//         p_x[i] = FALSE;
-//       } else if ((p_x[i] == NA_LOGICAL) || (p_y[yi] == NA_LOGICAL)){
-//         p_x[i] = NA_LOGICAL;
-//       } else if (p_x[i] == TRUE && p_y[yi] == TRUE){
-//         p_x[i] = TRUE;
-//       }
-//     }
-//   }
-//   return x;
-// }
-
 // Essentially `x | y` but updates x by reference
 
 [[cpp11::register]]
@@ -852,8 +766,8 @@ SEXP cpp_growth_rate(SEXP x){
     break;
   }
   case CHEAPR_INT64SXP: {
-    int_fast64_t x_n = INTEGER64_PTR(x)[n - 1];
-    int_fast64_t x_1 = INTEGER64_PTR(x)[0];
+    int64_t x_n = INTEGER64_PTR(x)[n - 1];
+    int64_t x_1 = INTEGER64_PTR(x)[0];
     a = R_SCALAR_AS_DOUBLE(x_1, NA_INTEGER64);
     b = R_SCALAR_AS_DOUBLE(x_n, NA_INTEGER64);
     break;
@@ -884,7 +798,7 @@ SEXP create_df_row_names(int n){
 
 [[cpp11::register]]
 SEXP cpp_name_repair(SEXP names, SEXP dup_sep, SEXP empty_sep){
-  int NP = 0;
+  int32_t NP = 0;
   if (is_null(names)) return names;
 
   if (TYPEOF(names) != STRSXP){
@@ -942,10 +856,10 @@ SEXP cpp_name_repair(SEXP names, SEXP dup_sep, SEXP empty_sep){
 }
 
 [[cpp11::register]]
-SEXP cpp_reconstruct(SEXP target, SEXP source, SEXP target_attr_names, SEXP source_attr_names,
-                     bool shallow_copy){
+SEXP cpp_rebuild(SEXP target, SEXP source, SEXP target_attr_names,
+                 SEXP source_attr_names, bool shallow_copy){
 
-  int NP = 0;
+  int32_t NP = 0;
 
   if (shallow_copy){
     SHIELD(target = Rf_shallow_duplicate(target)); ++NP;
@@ -960,7 +874,7 @@ SEXP cpp_reconstruct(SEXP target, SEXP source, SEXP target_attr_names, SEXP sour
   SEXP source_attrs = ATTRIB(source);
 
   // Start from clean slate - no attributes
-  cpp_set_rm_attributes(target);
+  clear_attributes(target);
 
   SEXP tag = R_NilValue;
   SEXP current = R_NilValue;
@@ -1007,45 +921,74 @@ SEXP cpp_reconstruct(SEXP target, SEXP source, SEXP target_attr_names, SEXP sour
 
 [[cpp11::register]]
 SEXP cpp_str_coalesce(SEXP x){
+
   if (TYPEOF(x) != VECSXP){
     Rf_error("`x` must be a list of character vectors in %s", __func__);
   }
 
-  int n = Rf_xlength(x);
-
-  R_xlen_t out_size = 0;
+  int32_t NP = 0;
+  uint_fast64_t n = Rf_xlength(x);
+  uint_fast64_t out_size = 0;
+  uint_fast64_t m;
 
   const SEXP *p_x = VECTOR_PTR_RO(x);
+  std::vector<const SEXP*> str_ptrs(n);
 
-  for (R_xlen_t i = 0; i < n; ++i){
-    if (Rf_xlength(p_x[i]) == 0){
-      return Rf_allocVector(STRSXP, 0);
+  SEXP char_vec = R_NilValue;
+  uint32_t xtype;
+
+  bool shallow_duplicated = false;
+
+  for (uint_fast64_t i = 0; i < n; ++i){
+    char_vec = p_x[i];
+    xtype = TYPEOF(char_vec);
+
+    if (xtype != STRSXP){
+      if (!shallow_duplicated){
+        SHIELD(x = Rf_shallow_duplicate(x)); ++NP;
+        p_x = VECTOR_PTR_RO(x);
+        shallow_duplicated = true;
+      }
+      SET_VECTOR_ELT(x, i, base_as_character(char_vec));
+      char_vec = p_x[i];
     }
-    if (TYPEOF(p_x[i]) != STRSXP){
-      Rf_error("All elements of `x` must be character vectors in %s", __func__);
+
+    str_ptrs[i] = STRING_PTR_RO(char_vec);
+
+    if (xtype != NILSXP){
+      m = Rf_xlength(char_vec);
+      if (m == 0){
+        YIELD(NP);
+        return Rf_allocVector(STRSXP, 0);
+      }
+      out_size = std::max(out_size, m);
     }
-    out_size = std::max(out_size, Rf_xlength(p_x[i]));
   }
 
+  SEXP out = SHIELD(Rf_allocVector(STRSXP, out_size)); ++NP;
 
-  SEXP out = SHIELD(Rf_allocVector(STRSXP, out_size));
+  SEXP inner_char = R_BlankString;
 
-  SEXP inner_char;
-  PROTECT_INDEX inner_char_idx;
+  uint_fast64_t n_nas;
 
-  R_ProtectWithIndex(inner_char = R_BlankString, &inner_char_idx);
-
-
-  for (R_xlen_t i = 0; i < out_size; ++i){
-    for (R_xlen_t j = 0; j < n; ++j){
-      R_Reprotect(inner_char = STRING_ELT(p_x[j], i % Rf_xlength(p_x[j])), inner_char_idx);
-      if (inner_char != R_BlankString){
+  for (uint_fast64_t i = 0; i < out_size; ++i){
+    n_nas = 0;
+    for (uint_fast64_t j = 0; j < n; ++j){
+      m = Rf_xlength(p_x[j]);
+      if (m == 0) continue;
+      inner_char = str_ptrs[j][i % m];
+      n_nas += inner_char == NA_STRING;
+      if (!(inner_char == R_BlankString || inner_char == NA_STRING)){
         SET_STRING_ELT(out, i, inner_char);
         break;
       }
+      // If all ith elements are NA, then return NA
+      if (n_nas == n){
+        SET_STRING_ELT(out, i, NA_STRING);
+      }
     }
   }
-  YIELD(2);
+  YIELD(NP);
   return out;
 }
 
@@ -1171,3 +1114,31 @@ SEXP cpp_str_coalesce(SEXP x){
 //   YIELD(1);
 //   return count;
 // }
+
+// R's internal tabulate with faster unsigned int check
+[[cpp11::register]]
+SEXP cpp_tabulate(SEXP x, uint32_t n_bins){
+
+  if (n_bins > integer_max_){
+    Rf_error("`n_bins` must be < 2^31 in %s", __func__);
+  }
+  R_xlen_t n = Rf_xlength(x);
+
+  SEXP out = SHIELD(new_vec(INTSXP, n_bins));
+  const int *p_x = INTEGER_RO(x);
+  int* RESTRICT p_out = INTEGER(out);
+
+  // Initialise counts to 0
+  memset(p_out, 0, n_bins * sizeof(int));
+
+  uint32_t one = 1;
+
+  OMP_FOR_SIMD
+  for (R_xlen_t i = 0 ; i < n; ++i){
+    if ((static_cast<uint32_t>(p_x[i]) - one) < n_bins){
+      ++p_out[p_x[i] - 1];
+    }
+  }
+  YIELD(1);
+  return out;
+}

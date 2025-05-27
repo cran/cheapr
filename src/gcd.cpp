@@ -74,8 +74,8 @@ int cpp_gcd2_int(int x, int y, bool na_rm){
   return x;
 }
 
-int_fast64_t cpp_gcd2_int64(int_fast64_t x, int_fast64_t y, bool na_rm){
-  int_fast64_t zero = 0;
+int64_t cpp_gcd2_int64(int64_t x, int64_t y, bool na_rm){
+  int64_t zero = 0;
   bool has_na = ( x == NA_INTEGER64 || y == NA_INTEGER64 );
   if (!na_rm && has_na){
     return NA_INTEGER64;
@@ -99,7 +99,7 @@ int_fast64_t cpp_gcd2_int64(int_fast64_t x, int_fast64_t y, bool na_rm){
   if (y == zero){
     return x;
   }
-  int_fast64_t r;
+  int64_t r;
   // Taken from number theory lecture notes
   while(y != zero){
     r = x % y;
@@ -120,7 +120,7 @@ double cpp_lcm2(double x, double y, double tol, bool na_rm){
   return ( std::fabs(x) / cpp_gcd2(x, y, tol, true) ) * std::fabs(y);
 }
 
-int_fast64_t cpp_lcm2_int64(int_fast64_t x, int_fast64_t y, bool na_rm){
+int64_t cpp_lcm2_int64(int64_t x, int64_t y, bool na_rm){
   int num_nas = (x == NA_INTEGER64) + (y == NA_INTEGER64);
   if ( num_nas >= 1 ){
     if (na_rm && num_nas == 1){
@@ -138,7 +138,7 @@ int_fast64_t cpp_lcm2_int64(int_fast64_t x, int_fast64_t y, bool na_rm){
   // res can be an int because the gcd ensures the denom
   // divides x by a whole number
 
-  int_fast64_t res = std::llabs(x) / cpp_gcd2_int64(x, y, false);
+  int64_t res = std::llabs(x) / cpp_gcd2_int64(x, y, false);
   if (y != 0 && (std::llabs(res) > (integer64_max_ / std::llabs(y)))){
     Rf_error("64-bit integer overflow, please use doubles");
   } else {
@@ -166,7 +166,7 @@ SEXP cpp_gcd(SEXP x, double tol, bool na_rm, bool break_early, bool round){
   if (tol < 0 || tol >= 1){
     Rf_error("tol must be >= 0 and < 1");
   }
-  int NP = 0;
+  int32_t NP = 0;
   R_xlen_t n = Rf_xlength(x);
 
   switch(CHEAPR_TYPEOF(x)){
@@ -194,11 +194,11 @@ SEXP cpp_gcd(SEXP x, double tol, bool na_rm, bool break_early, bool round){
     return out;
   }
   case CHEAPR_INT64SXP: {
-    const int_fast64_t *p_x = INTEGER64_PTR(x);
+    const int64_t *p_x = INTEGER64_PTR(x);
     SEXP out = SHIELD(new_vec(REALSXP, n == 0 ? 0 : 1)); ++NP;
     if (n > 0){
-      int_fast64_t gcd = p_x[0];
-      int_fast64_t agcd;
+      int64_t gcd = p_x[0];
+      int64_t agcd;
       for (R_xlen_t i = 1; i < n; ++i) {
         gcd = cpp_gcd2_int64(gcd, p_x[i], na_rm);
         if (gcd == NA_INTEGER64){
@@ -252,7 +252,7 @@ SEXP cpp_lcm(SEXP x, double tol, bool na_rm){
     Rf_error("tol must be >= 0 and < 1");
   }
   R_xlen_t n = Rf_xlength(x);
-  int NP = 0;
+  int32_t NP = 0;
 
   switch(CHEAPR_TYPEOF(x)){
   case LGLSXP:
@@ -264,7 +264,7 @@ SEXP cpp_lcm(SEXP x, double tol, bool na_rm){
     if (n > 0){
 
       // Initialise first value as lcm
-      int_fast64_t lcm = CHEAPR_INT_TO_INT64(p_x[0]);
+      int64_t lcm = CHEAPR_INT_TO_INT64(p_x[0]);
 
       for (R_xlen_t i = 1; i < n; ++i) {
         if (!na_rm && lcm == NA_INTEGER64){
@@ -288,13 +288,13 @@ SEXP cpp_lcm(SEXP x, double tol, bool na_rm){
     return out;
   }
   case CHEAPR_INT64SXP: {
-    int_fast64_t *p_x = INTEGER64_PTR(x);
+    int64_t *p_x = INTEGER64_PTR(x);
 
     SEXP out = SHIELD(new_vec(REALSXP, n == 0 ? 0 : 1)); ++NP;
 
     if (n > 0){
       // Initialise first value as lcm
-      int_fast64_t lcm = p_x[0];
+      int64_t lcm = p_x[0];
 
       for (R_xlen_t i = 1; i < n; ++i) {
         if (!na_rm && lcm == NA_INTEGER64){
@@ -336,7 +336,7 @@ SEXP cpp_gcd2_vectorised(SEXP x, SEXP y, double tol, bool na_rm){
   if (tol < 0 || tol >= 1){
     Rf_error("tol must be >= 0 and < 1");
   }
-  int NP = 0;
+  int32_t NP = 0;
   R_xlen_t xn = Rf_xlength(x);
   R_xlen_t yn = Rf_xlength(y);
   R_xlen_t n = std::max(xn, yn);
@@ -388,7 +388,7 @@ SEXP cpp_lcm2_vectorised(SEXP x, SEXP y, double tol, bool na_rm){
   if (tol < 0 || tol >= 1){
     Rf_error("tol must be >= 0 and < 1");
   }
-  int NP = 0;
+  int32_t NP = 0;
   R_xlen_t xn = Rf_xlength(x);
   R_xlen_t yn = Rf_xlength(y);
   R_xlen_t n = std::max(xn, yn);

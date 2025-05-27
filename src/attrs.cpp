@@ -29,6 +29,15 @@ SEXP cpp_set_rm_attributes(SEXP x){
   return x;
 }
 
+// Same as above but no return
+void clear_attributes(SEXP x){
+  SEXP current = ATTRIB(x);
+  while (current != R_NilValue){
+    Rf_setAttrib(x, TAG(current), R_NilValue);
+    current = CDR(current);
+  }
+}
+
 // Add attribute onto existing attributes
 
 [[cpp11::register]]
@@ -54,16 +63,17 @@ SEXP cpp_set_rm_attr(SEXP x, SEXP which){
 [[cpp11::register]]
 SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add) {
 
-  if (!add) cpp_set_rm_attributes(x);
+  if (!add) clear_attributes(x);
 
-  int NP = 0;
+  int32_t NP = 0;
 
   if (is_null(attributes)){
     return x;
   } else if (TYPEOF(attributes) == VECSXP){
     if (Rf_length(attributes) == 0) return x;
-    SEXP names = get_names(attributes);
+    SEXP names = SHIELD(get_names(attributes)); ++NP;
     if (is_null(names)){
+      YIELD(NP);
       Rf_error("attributes must be a named list");
     }
     const SEXP *p_attributes = VECTOR_PTR_RO(attributes);

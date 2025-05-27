@@ -7,7 +7,7 @@
 // }
 
 [[cpp11::register]]
-SEXP reconstruct(SEXP x, SEXP source, bool shallow_copy){
+SEXP rebuild(SEXP x, SEXP source, bool shallow_copy){
   if (is_df(x)){
     if (is_bare_df(source)){
       if (!shallow_copy && is_bare_df(x)){
@@ -32,12 +32,12 @@ SEXP reconstruct(SEXP x, SEXP source, bool shallow_copy){
       }
     } else {
 
-      // Method dispatch, users can write `reconstruct` methods which
+      // Method dispatch, users can write `rebuild` methods which
       // this will use
-      return cheapr_reconstruct(x, source, cpp11::named_arg("shallow_copy") = shallow_copy);
+      return cheapr_rebuild(x, source, cpp11::named_arg("shallow_copy") = shallow_copy);
     }
   } else {
-    return cheapr_reconstruct(x, source);
+    return cheapr_rebuild(x, source);
   }
 }
 
@@ -55,13 +55,14 @@ SEXP cpp_rep_len(SEXP x, int length){
     for (int i = 0; i < n_cols; ++i){
       SET_VECTOR_ELT(out, i, cpp_rep_len(p_x[i], length));
     }
-    set_names(out, get_names(x));
+    SEXP names = SHIELD(get_names(x));
+    set_names(out, names);
     set_list_as_df(out);
     Rf_setAttrib(out, R_RowNamesSymbol, create_df_row_names(length));
-    SHIELD(out = reconstruct(out, x, false));
-    YIELD(2);
+    SHIELD(out = rebuild(out, x, false));
+    YIELD(3);
     return out;
-  } else if (is_simple_vec(x)){
+  } else if (is_simple_vec2(x)){
 
     int size = Rf_length(x);
     int n_chunks, k, chunk_size;
@@ -69,7 +70,7 @@ SEXP cpp_rep_len(SEXP x, int length){
     // Return x if length(x) == length
     if (out_size == size) return x;
 
-    switch (TYPEOF(x)){
+    switch (CHEAPR_TYPEOF(x)){
     case LGLSXP:
     case INTSXP: {
       const int *p_x = INTEGER(x);
@@ -96,6 +97,37 @@ SEXP cpp_rep_len(SEXP x, int length){
         OMP_FOR_SIMD
         for (int i = 0; i < out_size; ++i){
           p_out[i] = NA_INTEGER;
+        }
+      }
+      Rf_copyMostAttrib(x, out);
+      YIELD(1);
+      return out;
+    }
+    case CHEAPR_INT64SXP: {
+      const int64_t *p_x = INTEGER64_PTR(x);
+      SEXP out = SHIELD(new_vec(REALSXP, out_size));
+      int64_t* RESTRICT p_out = INTEGER64_PTR(out);
+
+      if (size == 1){
+        int64_t val = p_x[0];
+        if (val == 0){
+          memset(p_out, 0, out_size * sizeof(int64_t));
+        } else {
+          OMP_FOR_SIMD
+          for (int i = 0; i < out_size; ++i) p_out[i] = val;
+        }
+      } else if (out_size > 0 && size > 0){
+        n_chunks = std::ceil((static_cast<double>(out_size)) / size);
+        for (int i = 0; i < n_chunks; ++i){
+          k = i * size;
+          chunk_size = std::min(k + size, out_size) - k;
+          memcpy(&p_out[k], &p_x[0], chunk_size * sizeof(int64_t));
+        }
+        // If length > 0 but length(x) == 0 then fill with NA
+      } else if (size == 0 && out_size > 0){
+        OMP_FOR_SIMD
+        for (int i = 0; i < out_size; ++i){
+          p_out[i] = NA_INTEGER64;
         }
       }
       Rf_copyMostAttrib(x, out);
@@ -205,11 +237,19 @@ SEXP cpp_rep_len(SEXP x, int length){
       return out;
     }
     default: {
+      if (r_length(x) == length){
+      return x;
+    } else {
       return base_rep(x, cpp11::named_arg("length.out") = length);
     }
     }
+    }
   } else {
-    return base_rep(x, cpp11::named_arg("length.out") = length);
+    if (r_length(x) == length){
+      return x;
+    } else {
+      return base_rep(x, cpp11::named_arg("length.out") = length);
+    }
   }
 }
 
@@ -241,7 +281,7 @@ SEXP cpp_rep(SEXP x, SEXP times){
       if (Rf_length(x) == 0){
         SEXP out = SHIELD(Rf_shallow_duplicate(x));
         Rf_setAttrib(out, R_RowNamesSymbol, create_df_row_names(cpp_sum(times)));
-        SHIELD(out = reconstruct(out, x, false));
+        SHIELD(out = rebuild(out, x, false));
         YIELD(3);
         return out;
       } else {
@@ -252,7 +292,7 @@ SEXP cpp_rep(SEXP x, SEXP times){
         return out;
       }
 
-    } else if (is_simple_vec(x)){
+    } else if (is_simple_vec2(x)){
       SEXP out = SHIELD(new_vec(TYPEOF(x), cpp_sum(times)));
       switch (TYPEOF(x)){
       case LGLSXP:
@@ -320,24 +360,11 @@ SEXP cpp_rep(SEXP x, SEXP times){
       return out;
     }
   }
-  // SEXP temp_list = SHIELD(new_vec(VECSXP, n_times));
-  // SEXP temp;
-  // PROTECT_INDEX temp_idx;
-  // R_ProtectWithIndex(temp = R_NilValue, &temp_idx);
-  //
-  // for (R_xlen_t i = 0; i < n_times; ++i){
-  //   R_Reprotect(temp = slice_loc(x, i), temp_idx);
-  //   SET_VECTOR_ELT(temp_list, i, cpp_rep_len(temp, p_times[i]));
-  // }
-  //
-  // SEXP out = SHIELD(cpp_c(temp_list));
-  // YIELD(4);
-  // return out;
 }
 
 [[cpp11::register]]
 SEXP cpp_rep_each(SEXP x, SEXP each){
-  int NP = 0;
+  int32_t NP = 0;
   SHIELD(each = coerce_vector(each, INTSXP)); ++NP;
   if (Rf_length(each) == 1){
     if (INTEGER(each)[0] == 1){
@@ -355,9 +382,9 @@ SEXP cpp_rep_each(SEXP x, SEXP each){
 
 [[cpp11::register]]
 SEXP cpp_recycle(SEXP x, SEXP length){
-  SEXP out = SHIELD(cpp_drop_null(x, true));
+  SEXP out = SHIELD(cpp_drop_null(x, false));
   SEXP sizes = SHIELD(cpp_lengths(out, false));
-  int *p_sizes = INTEGER(sizes);
+  const int *p_sizes = INTEGER(sizes);
   bool has_length = !is_null(length);
   SHIELD(length = coerce_vec(length, INTSXP));
 
@@ -392,42 +419,48 @@ SEXP cpp_recycle(SEXP x, SEXP length){
 // Doesn't return unique df rows
 SEXP cpp_unique(SEXP x, bool names){
 
+  int32_t NP = 0;
+
   bool is_simple = is_simple_atomic_vec(x);
 
   if (is_compact_seq(x)){
     return x;
   } else if (is_simple && Rf_length(x) < 10000){
-    SEXP dup = SHIELD(Rf_duplicated(x, FALSE));
-    SEXP unique_locs = SHIELD(cpp_which_(dup, true));
+    SEXP dup = SHIELD(Rf_duplicated(x, FALSE)); ++NP;
+    SEXP unique_locs = SHIELD(cpp_which_(dup, true)); ++NP;
     if (Rf_length(unique_locs) == Rf_length(x)){
-      YIELD(2);
+      YIELD(NP);
       return x;
     } else {
-      SEXP out = SHIELD(sset_vec(x, unique_locs, false));
+      SEXP out = SHIELD(sset_vec(x, unique_locs, false)); ++NP;
       Rf_copyMostAttrib(x, out);
       if (names){
-        set_names(out, sset_vec(get_names(x), unique_locs, false));
+        SEXP names = SHIELD(get_names(x)); ++NP;
+        SHIELD(names = sset_vec(names, unique_locs, false)); ++NP;
+        set_names(out, names);
       }
-      YIELD(3);
+      YIELD(NP);
       return out;
     }
   } else if (is_simple){
-    SEXP out = SHIELD(cheapr_fast_unique(x));
+    SEXP out = SHIELD(cheapr_fast_unique(x)); ++NP;
     if (names){
-      set_names(out, cheapr_fast_unique(get_names(x)));
+      SEXP names = SHIELD(get_names(x)); ++NP;
+      SHIELD(names = cheapr_fast_unique(names)); ++NP;
+      set_names(out, names);
     }
-    YIELD(1);
+    YIELD(NP);
     return out;
   } else {
-    SEXP out = SHIELD(cpp11::package("base")["unique"](x));
+    SEXP out = SHIELD(cpp11::package("base")["unique"](x)); ++NP;
     if (names){
-      SEXP names = cpp11::package("base")["names"](x);
-      SHIELD(names = cheapr_fast_unique(names));
-      SHIELD(out = cpp11::package("base")["names<-"](out, names));
-      YIELD(3);
+      SEXP names = SHIELD(cpp11::package("base")["names"](x)); ++NP;
+      SHIELD(names = cheapr_fast_unique(names)); ++NP;
+      SHIELD(out = cpp11::package("base")["names<-"](out, names)); ++NP;
+      YIELD(NP);
       return out;
     } else {
-      YIELD(1);
+      YIELD(NP);
       return out;
     }
   }
@@ -476,7 +509,7 @@ SEXP cpp_intersect(SEXP x, SEXP y, bool unique){
 //
 //   bool is_simple = is_simple_atomic_vec(x) && is_simple_atomic_vec(y);
 //
-//   int NP = 0;
+//   int32_t NP = 0;
 //   if (is_simple){
 //     if (!dups){
 //       SHIELD(x = cpp_unique(x)); ++NP;
@@ -527,54 +560,12 @@ SEXP get_ptypes(SEXP x){
     SET_VECTOR_ELT(out, i, get_ptype(VECTOR_ELT(x, i)));
   }
 
-  set_names(out, get_names(x));
+  SEXP names = SHIELD(get_names(x));
+  set_names(out, names);
 
-  YIELD(1);
+  YIELD(2);
   return out;
 }
-
-// SEXP cpp_cast(SEXP x, SEXP y){
-  // int NP = 0;
-  //
-  // SEXP x_cls = Rf_getAttrib(x, R_ClassSymbol);
-  // SEXP y_cls = Rf_getAttrib(y, R_ClassSymbol);
-  //
-  // SHIELD(x_cls = coerce_vec(x_cls, STRSXP)); ++NP;
-  // SHIELD(y_cls = coerce_vec(y_cls, STRSXP)); ++NP;
-  //
-  // if ( (TYPEOF(x) == TYPEOF(y)) && (Rf_length(x_cls) == Rf_length(y_cls))){
-  //
-  //   bool class_identical = true;
-  //
-  //   for (int i = 0; i < Rf_length(x_cls); ++i){
-  //     if (std::strcmp(utf8_char(STRING_ELT(x_cls, i)), utf8_char(STRING_ELT(y_cls, i))) != 0){
-  //       class_identical = false; break;
-  //     }
-  //   }
-  //   if (class_identical){
-  //     YIELD(NP);
-  //     return x;
-  //   }
-  // }
-  //
-  // if (is_simple_vec(x) && is_simple_vec(y) &&
-  //     !Rf_inherits(x, "factor") && !Rf_inherits(y, "factor")){
-  //     if (CHEAPR_TYPEOF(x) >= CHEAPR_TYPEOF(y)){
-  //       SEXP out = SHIELD(new_vec(TYPEOF(x), Rf_xlength(x))); ++NP;
-  //       Rf_copyMostAttrib(y, out);
-  //       YIELD(NP);
-  //       return out;
-  //     } else {
-  //       SEXP out = SHIELD(coerce_vector(x, CHEAPR_TYPEOF(y))); ++NP;
-  //       Rf_copyMostAttrib(y, out);
-  //       YIELD(NP);
-  //       return out;
-  //     }
-  // } else {
-  //   YIELD(NP);
-  //   Rf_error("Can't convert `x` based on `y` in %s", __func__);
-  // }
-// }
 
 SEXP cpp_factor_as_character(SEXP x){
   return sset_vec(Rf_getAttrib(x, R_LevelsSymbol), x, true);
@@ -647,7 +638,7 @@ SEXP cpp_combine_factors(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_list_c(SEXP x){
-  int NP = 0;
+  int32_t NP = 0;
   R_xlen_t n = Rf_xlength(x);
   const SEXP *p_x = VECTOR_PTR_RO(x);
 
@@ -680,7 +671,7 @@ SEXP cpp_list_c(SEXP x){
 
     if (TYPEOF(p_x[i]) == VECSXP){
       p_temp = VECTOR_PTR_RO(p_x[i]);
-      names = get_names(p_x[i]);
+      R_Reprotect(names = get_names(p_x[i]), nm_idx);
       m = Rf_xlength(p_x[i]);
     } else {
       SET_VECTOR_ELT(container_list, 0, p_x[i]);
@@ -748,7 +739,7 @@ SEXP cpp_df_c(SEXP x){
 
   if (n_frames == 0) return R_NilValue;
 
-  int NP = 0;
+  int32_t NP = 0;
   const SEXP *p_x = VECTOR_PTR_RO(x);
 
   SEXP df = p_x[0];
@@ -767,16 +758,18 @@ SEXP cpp_df_c(SEXP x){
   SET_VECTOR_ELT(frames, 0, df_template);
 
   SEXP ptypes, new_names, new_ptypes, new_cols,
-  temp_list;
+  temp_list, df_names, ptype_names;
   PROTECT_INDEX
   new_names_idx, ptypes_idx, new_ptypes_idx, new_cols_idx,
-  temp_list_idx;
+  temp_list_idx, df_names_idx, ptype_names_idx;
 
   R_ProtectWithIndex(ptypes = get_ptypes(df), &ptypes_idx); ++NP;
   R_ProtectWithIndex(new_names = R_NilValue, &new_names_idx); ++NP;
   R_ProtectWithIndex(new_ptypes = R_NilValue, &new_ptypes_idx); ++NP;
   R_ProtectWithIndex(new_cols = R_NilValue, &new_cols_idx); ++NP;
   R_ProtectWithIndex(temp_list = new_vec(VECSXP, 2), &temp_list_idx); ++NP;
+  R_ProtectWithIndex(df_names = R_NilValue, &df_names_idx); ++NP;
+  R_ProtectWithIndex(ptype_names = R_NilValue, &ptype_names_idx); ++NP;
 
   // We do 2 passes
   // 1st pass: Check inputs are dfs and construct prototype list
@@ -791,8 +784,11 @@ SEXP cpp_df_c(SEXP x){
       YIELD(NP); Rf_error("Can't combine data frames with non data frames");
     }
 
+    R_Reprotect(df_names = get_names(df), df_names_idx);
+    R_Reprotect(ptype_names = get_names(ptypes), ptype_names_idx);
+
     R_Reprotect(new_names = cpp_setdiff(
-      get_names(df), get_names(ptypes), false
+      df_names, ptype_names, false
     ), new_names_idx);
 
     // Adjust prototype list
@@ -837,7 +833,7 @@ SEXP cpp_df_c(SEXP x){
   set_list_as_df(out);
   Rf_setAttrib(out, R_RowNamesSymbol, create_df_row_names(out_size));
   set_names(out, names);
-  SHIELD(out = reconstruct(out, df_template, false)); ++NP;
+  SHIELD(out = rebuild(out, df_template, false)); ++NP;
   YIELD(NP);
   return out;
 }
@@ -846,7 +842,7 @@ SEXP cpp_df_c(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_df_col_c(SEXP x, bool recycle, bool name_repair){
-  int NP = 0;
+  int32_t NP = 0;
 
   // Important to recycle first to avoid incorrect size calculations
 
@@ -894,7 +890,7 @@ SEXP cpp_df_col_c(SEXP x, bool recycle, bool name_repair){
     const SEXP *p_temp = df_pointers[i];
 
     if (is_df(p_x[i])){
-      names = get_names(p_x[i]);
+      R_Reprotect(names = get_names(p_x[i]), nm_idx);
       m = Rf_length(p_x[i]);
     } else {
       SET_VECTOR_ELT(container_list, 0, p_x[i]);
@@ -930,101 +926,11 @@ SEXP cpp_df_col_c(SEXP x, bool recycle, bool name_repair){
   SHIELD(out = cpp_new_df(out, r_nrows, false, name_repair)); ++NP;
 
   if (Rf_length(x) != 0 && is_df(VECTOR_ELT(x, 0))){
-    SHIELD(out = reconstruct(out, VECTOR_ELT(x, 0), false)); ++NP;
+    SHIELD(out = rebuild(out, VECTOR_ELT(x, 0), false)); ++NP;
   }
   YIELD(NP);
   return out;
 }
-// SEXP cpp_df_col_c2(SEXP x, bool recycle, bool name_repair){
-//   int NP = 0;
-//
-//   // Important to recycle first to avoid incorrect size calculations
-//
-//   if (recycle){
-//     SHIELD(x = cpp_recycle(x, R_NilValue)); ++NP;
-//   }
-//
-//   int n = Rf_length(x);
-//   const SEXP *p_x = VECTOR_PTR_RO(x);
-//
-//   int out_ncols = 0;
-//
-//   SEXP container_list = SHIELD(new_vec(VECSXP, 1)); ++NP;
-//   Rf_setAttrib(container_list, R_NamesSymbol, R_BlankScalarString);
-//
-//   std::vector<const SEXP *> df_pointers(n);
-//   std::vector<int> ncols(n);
-//   for (int i = 0; i < n; ++i){
-//     if (is_df(p_x[i])){
-//       df_pointers[i] = VECTOR_PTR_RO(p_x[i]);
-//       ncols[i] = Rf_length(p_x[i]);
-//     } else {
-//       df_pointers[i] = VECTOR_PTR_RO(container_list);
-//       ncols[i] = 1;
-//     }
-//     out_ncols += ncols[i];
-//   }
-//
-//   SEXP x_names = SHIELD(get_names(x)); ++NP;
-//   bool x_has_names = !is_null(x_names);
-//
-//   SEXP out = SHIELD(new_vec(VECSXP, out_ncols)); ++NP;
-//
-//   SEXP names;
-//   PROTECT_INDEX nm_idx;
-//   R_ProtectWithIndex(names = R_NilValue, &nm_idx); ++NP;
-//
-//   SEXP out_names = SHIELD(new_vec(STRSXP, out_ncols)); ++NP;
-//   bool any_names = false;
-//
-//   int m;
-//   int k = 0;
-//
-//   for (int i = 0; i < n; ++i){
-//
-//     const SEXP *p_temp = df_pointers[i];
-//     m = ncols[i];
-//
-//     if (is_df(p_x[i])){
-//       R_Reprotect(names = Rf_getAttrib(p_x[i], R_NamesSymbol), nm_idx);
-//     } else {
-//       SET_VECTOR_ELT(container_list, 0, p_x[i]);
-//       if (x_has_names){
-//         R_Reprotect(names = scalar_utf8_str(STRING_ELT(x_names, i)), nm_idx);
-//       } else {
-//         R_Reprotect(names = R_NilValue, nm_idx);
-//       }
-//     }
-//
-//     any_names = any_names || !is_null(names);
-//     if (!is_null(names)){
-//       for (int j = 0; j < m; ++k, ++j){
-//         SET_VECTOR_ELT(out, k, p_temp[j]);
-//         SET_STRING_ELT(out_names, k, STRING_ELT(names, j));
-//       }
-//     } else {
-//       for (int j = 0; j < m; ++k, ++j){
-//         SET_VECTOR_ELT(out, k, p_temp[j]);
-//       }
-//     }
-//   }
-//   if (any_names){
-//     set_names(out, out_names);
-//   }
-//
-//   SEXP r_nrows = SHIELD(R_NilValue); ++NP;
-//   if (Rf_length(out) == 0 && Rf_length(x) != 0){
-//     SHIELD(r_nrows = Rf_ScalarInteger(vec_length(VECTOR_ELT(x, 0)))); ++NP;
-//   }
-//
-//   SHIELD(out = cpp_new_df(out, r_nrows, false, name_repair)); ++NP;
-//
-//   if (Rf_length(x) != 0 && is_df(VECTOR_ELT(x, 0))){
-//     SHIELD(out = reconstruct(out, VECTOR_ELT(x, 0))); ++NP;
-//   }
-//   YIELD(NP);
-//   return out;
-// }
 
 // `c()` but no concatenation of names
 [[cpp11::register]]
@@ -1032,7 +938,7 @@ SEXP cpp_c(SEXP x){
   if (TYPEOF(x) != VECSXP){
     Rf_error("`x` must be a list of vectors");
   }
-  int NP = 0;
+  int32_t NP = 0;
   int n = Rf_length(x);
   const SEXP *p_x = VECTOR_PTR_RO(x);
   if (n == 1){
@@ -1049,18 +955,21 @@ SEXP cpp_c(SEXP x){
   // We use the tz info of the first datetime vec to copy to final result
   int first_datetime = integer_max_;
 
+  SEXP elem = R_NilValue;
+
   for (int i = 0; i < n; ++i){
-    vector_type = std::max(vector_type, TYPEOF(p_x[i]));
-    out_size += Rf_xlength(p_x[i]);
-    is_factor = is_factor || Rf_isFactor(p_x[i]);
-    is_simple = is_simple || is_simple_atomic_vec(p_x[i]);
-    is_date = is_date || Rf_inherits(p_x[i], "Date");
-    is_datetime = is_datetime || Rf_inherits(p_x[i], "POSIXct");
+    elem = p_x[i];
+    vector_type = std::max(vector_type, TYPEOF(elem));
+    out_size += Rf_xlength(elem);
+    is_factor = is_factor || Rf_isFactor(elem);
+    is_simple = is_simple || is_simple_atomic_vec(elem);
+    is_date = is_date || Rf_inherits(elem, "Date");
+    is_datetime = is_datetime || Rf_inherits(elem, "POSIXct");
     if (is_datetime){
       first_datetime = std::min(i, first_datetime);
     }
-    is_frame = is_frame || is_df(p_x[i]);
-    is_classed = is_classed || Rf_isObject(p_x[i]);
+    is_frame = is_frame || is_df(elem);
+    is_classed = is_classed || Rf_isObject(elem);
   }
 
   // Date vectors can be ints but datetimes can't
