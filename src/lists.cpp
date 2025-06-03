@@ -39,7 +39,7 @@ SEXP cpp_unnested_length(SEXP x){
 SEXP cpp_lengths(SEXP x, bool names){
   R_xlen_t n = Rf_xlength(x);
   SEXP out = SHIELD(new_vec(INTSXP, n));
-  int *p_out = INTEGER(out);
+  int* RESTRICT p_out = INTEGER(out);
   if (TYPEOF(x) != VECSXP){
     for (R_xlen_t i = 0; i < n; ++i) {
       p_out[i] = 1;
@@ -83,26 +83,30 @@ SEXP cpp_new_list(SEXP size, SEXP default_value){
   return new_list(out_size, default_value);
 }
 
+uint_fast64_t null_count(SEXP x){
+  uint_fast64_t n = Rf_xlength(x);
+  const SEXP *p_x = VECTOR_PTR_RO(x);
+  uint_fast64_t n_null = 0;
+  for (uint_fast64_t i = 0; i < n; ++i) n_null += is_null(p_x[i]);
+  return n_null;
+}
+
 // Remove NULL elements from list
 
 [[cpp11::register]]
 SEXP cpp_drop_null(SEXP l, bool always_shallow_copy){
   const SEXP *p_l = VECTOR_PTR_RO(l);
-  uint_fast64_t n = Rf_length(l);
-  uint_fast64_t n_null = 0;
+  uint_fast64_t n = Rf_xlength(l);
+  uint_fast64_t n_null = null_count(l);
 
-  OMP_FOR_SIMD
-  for (uint_fast64_t i = 0; i < n; ++i) {
-    n_null += is_null(p_l[i]);
-  }
   if (n_null == 0){
     // Always return a plain-list
     if (!always_shallow_copy && is_bare_list(l)){
       return l;
     } else {
-      SEXP out = SHIELD(Rf_shallow_duplicate(l));
+      SEXP out = SHIELD(new_vec(VECSXP, n));
+      for (uint_fast64_t i = 0; i < n; ++i) SET_VECTOR_ELT(out, i, p_l[i]);
       SEXP names = SHIELD(get_names(l));
-      clear_attributes(out);
       set_names(out, names);
       YIELD(2);
       return out;
@@ -145,10 +149,7 @@ SEXP cpp_drop_null(SEXP l, bool always_shallow_copy){
 SEXP which_not_null(SEXP x){
   const SEXP *p_x = VECTOR_PTR_RO(x);
   R_xlen_t n = Rf_xlength(x);
-  R_xlen_t n_null = 0;
-  for (R_xlen_t i = 0; i < n; ++i) {
-    n_null += is_null(p_x[i]);
-  }
+  R_xlen_t n_null = null_count(x);
   R_xlen_t n_keep = n - n_null;
   R_xlen_t whichj = 0;
   R_xlen_t j = 0;

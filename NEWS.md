@@ -1,3 +1,24 @@
+# cheapr 1.3.1
+
+### Bug fixes
+
+- Fixed a bug where `recycle` sometimes modified lists in-place.
+
+- Fixed a rare issue that could in theory occur where -2147483648 would 
+be recognised as a representable integer in R.
+
+### Changes
+
+- `attrs_add` and `attrs_rm` have been renamed to `attrs_modify` and 
+`attrs_clear` respectively to convey their intent more clearly.
+
+- `as_df` now always returns a plain `data.frame` with only 3 attributes,
+'names', 'row.names' and 'class'.
+
+### New features
+
+- `df_modify` as a fast way to modify and add columns to a data frame.
+
 # cheapr 1.3.0
 
 ### Bug fixes

@@ -20,6 +20,9 @@
 #ifndef INTEGER64_PTR
 #define INTEGER64_PTR(x) ((int64_t*) REAL(x))
 #endif
+#ifndef INTEGER64_RO_PTR
+#define INTEGER64_RO_PTR(x) ((int64_t*) REAL_RO(x))
+#endif
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -39,13 +42,23 @@
 #endif
 
 // Not always guaranteed to be 32-bits
-#ifndef integer_max_
-#define integer_max_ std::numeric_limits<int>::max()
+
+#ifndef INTEGER_MIN
+#define INTEGER_MIN std::numeric_limits<int>::min() + 1
+#endif
+
+#ifndef INTEGER_MAX
+#define INTEGER_MAX std::numeric_limits<int>::max()
 #endif
 
 // Guaranteed to be 64-bits
-#ifndef integer64_max_
-#define integer64_max_ std::numeric_limits<int64_t>::max()
+
+#ifndef INTEGER64_MIN
+#define INTEGER64_MIN std::numeric_limits<int64_t>::min() + 1
+#endif
+
+#ifndef INTEGER64_MAX
+#define INTEGER64_MAX std::numeric_limits<int64_t>::max()
 #endif
 
 #ifndef NA_INTEGER64
@@ -117,6 +130,17 @@
 #define YIELD(n) (Rf_unprotect(n))
 #endif
 
+template<typename T>
+inline constexpr bool between(T x, T lo, T hi) {
+  return x >= lo && x <= hi;
+}
+
+template<typename T>
+inline constexpr bool is_integerable(T x){
+  return between<T>(x, INTEGER_MIN, INTEGER_MAX);
+}
+
+
 int num_cores();
 SEXP cpp_which_(SEXP x, bool invert);
 SEXP cpp_missing_row(SEXP x, double threshold, bool threshold_is_prop);
@@ -187,6 +211,7 @@ SEXP new_list(R_xlen_t length, SEXP default_value);
 void set_list_as_df(SEXP x);
 SEXP cpp_semi_copy(SEXP x);
 void clear_attributes(SEXP x);
+uint_fast64_t null_count(SEXP x);
 
 inline const char* utf8_char(SEXP x){
   return Rf_translateCharUTF8(x);

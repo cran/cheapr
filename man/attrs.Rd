@@ -2,11 +2,17 @@
 % Please edit documentation in R/attrs.R
 \name{attrs}
 \alias{attrs}
+\alias{attrs_modify}
 \alias{attrs_add}
+\alias{attrs_clear}
 \alias{attrs_rm}
 \title{Add and remove attributes}
 \usage{
+attrs_modify(x, ..., .set = FALSE, .args = NULL)
+
 attrs_add(x, ..., .set = FALSE, .args = NULL)
+
+attrs_clear(x, .set = FALSE)
 
 attrs_rm(x, .set = FALSE)
 }
