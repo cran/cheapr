@@ -73,93 +73,66 @@ SEXP cpp_rep_len(SEXP x, int length){
     switch (CHEAPR_TYPEOF(x)){
     case LGLSXP:
     case INTSXP: {
-      const int *p_x = INTEGER(x);
+      const int *p_x = INTEGER_RO(x);
       SEXP out = SHIELD(new_vec(TYPEOF(x), out_size));
       int* RESTRICT p_out = INTEGER(out);
 
       if (size == 1){
-        int val = p_x[0];
-        if (val == 0){
-          memset(p_out, 0, out_size * sizeof(int));
-        } else {
-          OMP_FOR_SIMD
-          for (int i = 0; i < out_size; ++i) p_out[i] = val;
-        }
+        std::fill(p_out, p_out + out_size, p_x[0]);
       } else if (out_size > 0 && size > 0){
         n_chunks = std::ceil(static_cast<double>(out_size) / size);
         for (int i = 0; i < n_chunks; ++i){
           k = i * size;
           chunk_size = std::min(k + size, out_size) - k;
-          memcpy(&p_out[k], &p_x[0], chunk_size * sizeof(int));
+          std::copy(p_x, p_x + chunk_size, p_out + k);
         }
         // If length > 0 but length(x) == 0 then fill with NA
       } else if (size == 0 && out_size > 0){
-        OMP_FOR_SIMD
-        for (int i = 0; i < out_size; ++i){
-          p_out[i] = NA_INTEGER;
-        }
+        std::fill(p_out, p_out + out_size, NA_INTEGER);
       }
       Rf_copyMostAttrib(x, out);
       YIELD(1);
       return out;
     }
     case CHEAPR_INT64SXP: {
-      const int64_t *p_x = INTEGER64_PTR(x);
+      const int64_t *p_x = INTEGER64_RO_PTR(x);
       SEXP out = SHIELD(new_vec(REALSXP, out_size));
       int64_t* RESTRICT p_out = INTEGER64_PTR(out);
 
       if (size == 1){
-        int64_t val = p_x[0];
-        if (val == 0){
-          memset(p_out, 0, out_size * sizeof(int64_t));
-        } else {
-          OMP_FOR_SIMD
-          for (int i = 0; i < out_size; ++i) p_out[i] = val;
-        }
+        std::fill(p_out, p_out + out_size, p_x[0]);
       } else if (out_size > 0 && size > 0){
         n_chunks = std::ceil((static_cast<double>(out_size)) / size);
         for (int i = 0; i < n_chunks; ++i){
           k = i * size;
           chunk_size = std::min(k + size, out_size) - k;
-          memcpy(&p_out[k], &p_x[0], chunk_size * sizeof(int64_t));
+          std::copy(p_x, p_x + chunk_size, p_out + k);
         }
         // If length > 0 but length(x) == 0 then fill with NA
       } else if (size == 0 && out_size > 0){
-        OMP_FOR_SIMD
-        for (int i = 0; i < out_size; ++i){
-          p_out[i] = NA_INTEGER64;
-        }
+        std::fill(p_out, p_out + out_size, NA_INTEGER64);
       }
       Rf_copyMostAttrib(x, out);
       YIELD(1);
       return out;
     }
     case REALSXP: {
-      const double *p_x = REAL(x);
+      const double *p_x = REAL_RO(x);
       SEXP out = SHIELD(new_vec(REALSXP, out_size));
       double* RESTRICT p_out = REAL(out);
 
       if (size == 1){
-       double val = p_x[0];
-        if (val == 0.0){
-          memset(p_out, 0, out_size * sizeof(double));
-        } else {
-          OMP_FOR_SIMD
-          for (int i = 0; i < out_size; ++i) p_out[i] = val;
-        }
+        std::fill(p_out, p_out + out_size, p_x[0]);
       } else if (out_size > 0 && size > 0){
         n_chunks = std::ceil((static_cast<double>(out_size)) / size);
         for (int i = 0; i < n_chunks; ++i){
           k = i * size;
           chunk_size = std::min(k + size, out_size) - k;
-          memcpy(&p_out[k], &p_x[0], chunk_size * sizeof(double));
+          std::copy(p_x, p_x + chunk_size, p_out + k);
         }
         // If length > 0 but length(x) == 0 then fill with NA
       } else if (size == 0 && out_size > 0){
-        OMP_FOR_SIMD
-        for (int i = 0; i < out_size; ++i){
-          p_out[i] = NA_REAL;
-        }
+        std::fill(p_out, p_out + out_size, NA_REAL);
       }
       Rf_copyMostAttrib(x, out);
       YIELD(1);
@@ -194,10 +167,7 @@ SEXP cpp_rep_len(SEXP x, int length){
       Rcomplex *p_out = COMPLEX(out);
 
       if (size == 1){
-        Rcomplex val = p_x[0];
-        for (int i = 0; i < out_size; ++i){
-          SET_COMPLEX_ELT(out, i, val);
-        }
+        std::fill(p_out, p_out + out_size, p_x[0]);
       } else if (out_size > 0 && size > 0){
         for (int i = 0, xi = 0; i < out_size; xi = (++xi == size) ? 0 : xi, ++i){
           SET_COMPLEX_ELT(out, i, p_x[xi]);
@@ -1014,9 +984,10 @@ SEXP cpp_c(SEXP x){
   }
 
   if (is_classed && !(is_date2 || is_datetime2)){
-    SEXP c_char = SHIELD(make_utf8_str("c"));
-    SEXP out = SHIELD(base_do_call(c_char, x));
-    YIELD(2);
+    SEXP call = SHIELD(coerce_vec(x, LISTSXP));
+    SHIELD(call = Rf_lcons(install_utf8("c"), call));
+    SEXP out = SHIELD(Rf_eval(call, R_GetCurrentEnv()));
+    YIELD(3);
     return out;
   }
 
@@ -1046,8 +1017,7 @@ SEXP cpp_c(SEXP x){
         R_Reprotect(temp = coerce_vec(p_x[i], vector_type), temp_idx);
       }
       m = Rf_xlength(temp);
-      const int *p_temp = INTEGER(temp);
-      memcpy(&p_out[k], &p_temp[0], m * sizeof(int));
+      std::copy_n(INTEGER_RO(temp), m, &p_out[k]);
     }
     break;
   }
@@ -1063,8 +1033,7 @@ SEXP cpp_c(SEXP x){
         R_Reprotect(temp = coerce_vec(p_x[i], vector_type), temp_idx);
       }
       m = Rf_xlength(temp);
-      const double *p_temp = REAL(temp);
-      memcpy(&p_out[k], &p_temp[0], m * sizeof(double));
+      std::copy_n(REAL_RO(temp), m, &p_out[k]);
     }
     break;
   }
@@ -1089,18 +1058,16 @@ SEXP cpp_c(SEXP x){
   case CPLXSXP: {
 
     out = SHIELD(new_vec(vector_type, out_size)); ++NP;
+    Rcomplex *p_out = COMPLEX(out);
 
-    for (int i = 0; i < n; ++i){
+    for (int i = 0; i < n; ++i, k += m){
       if (TYPEOF(p_x[i]) == vector_type){
         temp = p_x[i];
       } else {
         R_Reprotect(temp = coerce_vec(p_x[i], vector_type), temp_idx);
       }
       m = Rf_xlength(temp);
-      Rcomplex *p_temp = COMPLEX(temp);
-      for (R_xlen_t j = 0; j < m; ++k, ++j){
-        SET_COMPLEX_ELT(out, k, p_temp[j]);
-      }
+      std::copy_n(COMPLEX_RO(temp), m, p_out + k);
     }
     break;
   }

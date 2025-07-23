@@ -17,10 +17,6 @@ SEXP cpp_is_simple_vec(SEXP x){
   return scalar_lgl(is_simple_vec(x));
 }
 
-int int_div(int x, int y){
-  return x / y;
-}
-
 SEXP xlen_to_r(R_xlen_t x){
   return x > INTEGER_MAX ? Rf_ScalarReal(x) : Rf_ScalarInteger(x);
 }
@@ -98,13 +94,13 @@ void cpp_set_copy_elements(SEXP source, SEXP target){
   case INTSXP: {
     int *p_source = INTEGER(source);
     int *p_target = INTEGER(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(int));
+    safe_memmove(&p_target[0], &p_source[0], n * sizeof(int));
     break;
   }
   case REALSXP: {
     double *p_source = REAL(source);
     double *p_target = REAL(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(double));
+    safe_memmove(&p_target[0], &p_source[0], n * sizeof(double));
     break;
   }
   case STRSXP: {
@@ -117,13 +113,13 @@ void cpp_set_copy_elements(SEXP source, SEXP target){
   case CPLXSXP: {
     Rcomplex *p_source = COMPLEX(source);
     Rcomplex *p_target = COMPLEX(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(Rcomplex));
+    safe_memmove(&p_target[0], &p_source[0], n * sizeof(Rcomplex));
     break;
   }
   case RAWSXP: {
     Rbyte *p_source = RAW(source);
     Rbyte *p_target = RAW(target);
-    memmove(&p_target[0], &p_source[0], n * sizeof(Rbyte));
+    safe_memmove(&p_target[0], &p_source[0], n * sizeof(Rbyte));
     break;
   }
   default: {
@@ -1129,7 +1125,7 @@ SEXP cpp_tabulate(SEXP x, uint32_t n_bins){
   int* RESTRICT p_out = INTEGER(out);
 
   // Initialise counts to 0
-  memset(p_out, 0, n_bins * sizeof(int));
+  safe_memset(p_out, 0, n_bins * sizeof(int));
 
   uint32_t one = 1;
 
