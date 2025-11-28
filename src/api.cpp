@@ -1,28 +1,9 @@
-#include "cheapr.h"
-#include <cpp11/R.hpp>
-#include <cpp11/protect.hpp>
+#include <core.h>
+#include "decls.h"
 #include <R_ext/Rdynload.h> // For DllInfo on R 3.3
-#include <stdbool.h>
 
 // -----------------------------------------------------------------------------
 
-R_xlen_t
-api_vec_length(SEXP x) {
-  try {
-    return vec_length(x);
-  } catch (...) {
-    return (R_xlen_t) 0;
-  }
-}
-
-SEXP
-api_r_address(SEXP x) {
-  try {
-    return r_address(x);
-  } catch (...) {
-    return R_NilValue;
-  }
-}
 
 bool
 api_is_compact_seq(SEXP x) {
@@ -150,9 +131,9 @@ api_loc_set_replace(SEXP x, SEXP where, SEXP what){
 }
 
 SEXP
-api_sequence(SEXP size, SEXP from, SEXP by){
+api_sequence(SEXP size, SEXP from, SEXP by, bool as_list, bool add_id){
   try {
-    return cpp_sequence(size, from, by);
+    return cpp_sequence(size, from, by, as_list, add_id);
   } catch (...) {
     return R_NilValue;
   }
@@ -164,23 +145,6 @@ api_seq_len(R_xlen_t n){
     return cpp_seq_len(n);
   } catch (...) {
     return R_NilValue;
-  }
-}
-
-bool
-api_is_simple_atomic_vec(SEXP x){
-  try {
-    return is_simple_atomic_vec(x);
-  } catch (...) {
-    return false;
-  }
-}
-bool
-api_is_simple_vec(SEXP x){
-  try {
-    return is_simple_vec(x);
-  } catch (...) {
-    return false;
   }
 }
 
@@ -197,6 +161,15 @@ SEXP
 api_rep(SEXP x, SEXP times){
   try {
     return cpp_rep(x, times);
+  } catch (...) {
+    return R_NilValue;
+  }
+}
+
+SEXP
+api_rep_each(SEXP x, SEXP each){
+  try {
+    return cpp_rep_each(x, each);
   } catch (...) {
     return R_NilValue;
   }
@@ -375,12 +348,82 @@ api_semi_copy(SEXP x){
   }
 }
 
+SEXP
+api_paste(SEXP x, SEXP sep, SEXP collapse){
+  try {
+    return cpp_paste(x, sep, collapse);
+  } catch (...) {
+    return R_NilValue;
+  }
+}
+
+void
+api_replace(SEXP x, SEXP where, SEXP with, bool quiet){
+  try {
+    static_cast<void>(cpp_replace(x, where, with, true, quiet));
+  } catch (...) {
+  }
+}
+
+SEXP
+api_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na){
+  try {
+    return cpp_if_else(condition, yes, no, na);
+  } catch (...) {
+    return R_NilValue;
+  }
+}
+
+SEXP
+api_gcd(SEXP x, double tol, bool na_rm){
+  try {
+    return cpp_gcd(x, tol, na_rm, true, true);
+  } catch (...) {
+    return R_NilValue;
+  }
+}
+
+// Deprecated fns
+
+R_xlen_t
+api_vec_length(SEXP x) {
+  try {
+    return cheapr::vector_length(x);
+  } catch (...) {
+    return (R_xlen_t) 0;
+  }
+}
+
+SEXP
+api_r_address(SEXP x) {
+  try {
+    return cheapr::address(x);
+  } catch (...) {
+    return R_NilValue;
+  }
+}
+
+bool
+api_is_simple_atomic_vec(SEXP x){
+  try {
+    return cheapr::cheapr_is_simple_atomic_vec(x);
+  } catch (...) {
+    return false;
+  }
+}
+bool
+api_is_simple_vec(SEXP x){
+  try {
+    return cheapr::cheapr_is_simple_vec(x);
+  } catch (...) {
+    return false;
+  }
+}
+
 // -----------------------------------------------------------------------------
 
 [[cpp11::init]]
 void api_init(DllInfo* dll){
-  R_RegisterCCallable("cheapr", "api_vec_length",    (DL_FUNC)api_vec_length);
-  R_RegisterCCallable("cheapr", "api_r_address",    (DL_FUNC)api_r_address);
   R_RegisterCCallable("cheapr", "api_is_compact_seq",    (DL_FUNC)api_is_compact_seq);
   R_RegisterCCallable("cheapr", "api_create_df_row_names",    (DL_FUNC)api_create_df_row_names);
   R_RegisterCCallable("cheapr", "api_set_add_attrs",    (DL_FUNC)api_set_add_attrs);
@@ -403,11 +446,10 @@ void api_init(DllInfo* dll){
   R_RegisterCCallable("cheapr", "api_loc_set_replace",    (DL_FUNC)api_loc_set_replace);
   R_RegisterCCallable("cheapr", "api_sequence",    (DL_FUNC)api_sequence);
   R_RegisterCCallable("cheapr", "api_seq_len",    (DL_FUNC)api_seq_len);
-  R_RegisterCCallable("cheapr", "api_is_simple_atomic_vec",    (DL_FUNC)api_is_simple_atomic_vec);
-  R_RegisterCCallable("cheapr", "api_is_simple_vec",    (DL_FUNC)api_is_simple_vec);
   R_RegisterCCallable("cheapr", "api_recycle",    (DL_FUNC)api_recycle);
   R_RegisterCCallable("cheapr", "api_rep_len",    (DL_FUNC)api_rep_len);
   R_RegisterCCallable("cheapr", "api_rep",    (DL_FUNC)api_rep);
+  R_RegisterCCallable("cheapr", "api_rep_each",    (DL_FUNC)api_rep_each);
   R_RegisterCCallable("cheapr", "api_c",    (DL_FUNC)api_c);
   R_RegisterCCallable("cheapr", "api_list_c",    (DL_FUNC)api_list_c);
   R_RegisterCCallable("cheapr", "api_name_repair",    (DL_FUNC)api_name_repair);
@@ -420,4 +462,12 @@ void api_init(DllInfo* dll){
   R_RegisterCCallable("cheapr", "api_str_coalesce",    (DL_FUNC)api_str_coalesce);
   R_RegisterCCallable("cheapr", "api_rebuild",    (DL_FUNC)api_rebuild);
   R_RegisterCCallable("cheapr", "api_semi_copy",    (DL_FUNC)api_semi_copy);
+  R_RegisterCCallable("cheapr", "api_paste",    (DL_FUNC)api_paste);
+  R_RegisterCCallable("cheapr", "api_replace",    (DL_FUNC)api_replace);
+  R_RegisterCCallable("cheapr", "api_if_else",    (DL_FUNC)api_if_else);
+  R_RegisterCCallable("cheapr", "api_gcd",    (DL_FUNC)api_gcd);
+  R_RegisterCCallable("cheapr", "api_vec_length",    (DL_FUNC)api_vec_length);
+  R_RegisterCCallable("cheapr", "api_r_address",    (DL_FUNC)api_r_address);
+  R_RegisterCCallable("cheapr", "api_is_simple_atomic_vec",    (DL_FUNC)api_is_simple_atomic_vec);
+  R_RegisterCCallable("cheapr", "api_is_simple_vec",    (DL_FUNC)api_is_simple_vec);
 }

@@ -1,3 +1,100 @@
+# cheapr 1.4.0
+
+### New features 
+
+- A rich C++ API is now available. 
+
+To make use of the API, include the API header file
+
+`#include "cheapr_api.h"` 
+
+and then link to cheapr
+
+in R package description file.
+`LinkingTo: cheapr`
+
+or directly in C++ code
+`[[cpp11::linking_to("cheapr")]]`
+
+
+- New function `unique_` as a cheaper alternative to `unique`.
+
+- New function `replace_`, a cheaper alternative to `[<-` for fast 
+value replacement.
+
+- New functions `cast`, `cast_common`, `archetype`, `archetype_common`, `r_type`
+and `r_type_common` to help with fast type-stable coercion.
+
+- `paste_` as a fast alternative to `base::paste`.
+
+- New function `na_init` to help with fast initialisation of vectors based off
+a template vector.
+
+- `seq_` gains a new argument `size` to allow for specifying sequences
+of exact sizes. 
+Any combination of `from`, `to`, `by` and `size` can be specified and are
+vectorised.
+
+- Added argument `as_list` to `seq_` and `sequence_` to allow the 
+result to be returned as a list of sequences instead of a vector of combined
+sequences.
+
+- New vectorised functions `seq_start`, `seq_end` and `seq_increment` to help
+with sequence generation.
+
+- New function `is_whole_number` to check that a numeric vector consists 
+only of whole numbers. 
+
+- New function `switch_args` to give more flexibility to developers creating
+functions that accept the `...` argument.
+
+- Exported `cpp_rebuild`, a low-level convenience function for rebuilding
+attributes from a template.
+
+- New rebuild methods for `tbl_df` and `sf` objects.
+
+### Bug fixes
+
+- Fixed a bug in `case` that would return incorrect results when the length of 
+the RHS was greater than 1.
+
+### Changes and Improvements
+
+- `sset` is no longer an S3 generic and now internally dispatches on the 
+correct method. One can still define a subset method for custom objects 
+via `[` which `sset` falls back on when it can't find an appropriate method.
+
+- Combining vectors via `c_` has been internally made simpler, faster and 
+utilises type-stable common-casting.
+
+- `if_else_` has been re-written mostly in C/C++ and should be faster.
+
+- `as_df` has been re-written in C/C++ and now has much lower overhead.
+
+- The `.args` argument now accepts any list, even classed ones.
+
+- `rebuild.data.frame` and `rebuild.data.table` will now return a data frame 
+with class `'data.frame'` and `c('data.table', 'data.frame')` respectively instead of 
+returning a data frame with the class of the template data frame.
+
+- Added aliases for all functions named 'cheapr_' to follow the convention of
+`fn_()` where `fn()` is the common function they are replacing or improving.
+The current alternatives beginning with 'cheapr_' will likely not be deprecated
+for a long while.
+
+- `sequence_` will now recycle the `size` argument additionally to recycling
+`from` and `by`.
+
+- Subsetting `sf` objects with `sset` now internally calls `[`.
+
+### Breaking changes
+
+- Matrices are converted to data frames and arrays are converted to bare vectors 
+when using data frames via `new_df` and other data frame constructors.
+
+- `enframe_()`, `deframe_()` and `cut_numeric()` have been removed as they have
+been deprecated for a while.
+
 # cheapr 1.3.2
 
 ### Miscellaneous

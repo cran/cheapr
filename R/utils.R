@@ -71,18 +71,6 @@ fill_posixlt <- function(x, classed = TRUE){
   out
 }
 
-# balance_posixlt <- function(x, fill.only = FALSE, classed = TRUE){
-#   balance_pos <- tryCatch(get("balancePOSIXlt",
-#                               asNamespace("base"),
-#                               inherits = FALSE),
-#                           error = function(e) return(".r.error"))
-#   if (is.character(balance_pos) && length(balance_pos) == 1 && balance_pos == ".r.error"){
-#     fill_posixlt(x, classed = classed)
-#   } else {
-#     balance_pos(x, fill.only = fill.only, classed = classed)
-#   }
-# }
-
 #' @exportS3Method base::as.character
 as.character.vctrs_rcrd <- function(x, ...){
   format(x, ...)
@@ -159,7 +147,7 @@ fast_match <- function(x, table, nomatch = NA_integer_){
   collapse::fmatch(x, table, overid = 2L, nomatch = nomatch)
 }
 fast_unique <- function(x){
-  collapse::funique(x)
+  unique_(x)
 }
 
 vec_setdiff <- function(x, y, unique = FALSE){
@@ -169,14 +157,23 @@ vec_intersect <- function(x, y, unique = FALSE){
   .Call(`_cheapr_cpp_intersect`, x, y, unique)
 }
 
-# my_unique <- function(x, sort = FALSE){
-#   ids <- collapse::qG(x, sort = sort, na.exclude = FALSE)
-#   n_groups <- attr(ids, "N.groups", TRUE)
-#   cpp_get_unique(x, ids, n_groups)
-# }
+# `as.numeric` but keep integers as integers
+as_numeric <- function(x){
+  switch(typeof(x),
+         integer = as.integer(x),
+         as.double(x))
+}
 
-# my_unique2 <- function(x, sort = FALSE){
-#   ids <- collapse::qG(x, sort = sort, na.exclude = FALSE)
-#   n_groups <- attr(ids, "N.groups", TRUE)
-#   cpp_sset(x, cpp_group_starts(ids, n_groups), FALSE)
-# }
+numeric_subtraction <- function(x, y){
+  as_numeric(x) - as_numeric(y)
+}
+
+numeric_addition <- function(x, y){
+  as_numeric(x) + as_numeric(y)
+}
+
+# Kept for legacy reasons
+
+cpp_loc_set_replace <- function(x, where, what){
+  replace_(x, where, what, in_place = TRUE, quiet = TRUE)
+}

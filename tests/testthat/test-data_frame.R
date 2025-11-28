@@ -37,12 +37,14 @@ test_that("data frames", {
   )
   expect_identical(
     as_df(matrix(1:10, ncol = 2)),
-    new_df(V1 = 1:5, V2 = 6:10)
+    new_df(col_1 = 1:5, col_2 = 6:10)
   )
 
   expect_identical(
     as_df(list(x = x)),
-    list_as_df(list(x = x))
+    data.frame(x = 1:5)
   )
 
+
+  # new_df(y = 1, x = matrix(1:10, ncol = 2))
 })

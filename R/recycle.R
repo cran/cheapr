@@ -6,7 +6,9 @@
 #'
 #' @param ... Objects to recycle.
 #' @param length Optional length to recycle objects to.
-#' @param .args An alternative to `...` for easier programming with lists.
+#' @param .args An alternative to `...` so you can supply arguments directly
+#' in a list. \cr
+#' This is equivalent to `do.call(f, .args)` but much more efficient.
 #'
 #' @returns
 #' A list of recycled R objects.
@@ -35,6 +37,7 @@
 #' my_list <- list(from = 1L, to = 10L, by = seq(0.1, 1, 0.1))
 #' recycle(.args = my_list)
 #'
+#' @rdname recycle
 #' @export
 recycle <- function (..., length = NULL, .args = NULL){
   .Call(`_cheapr_cpp_recycle`, .Call(`_cheapr_cpp_list_args`, list(...), .args), length)

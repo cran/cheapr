@@ -14,7 +14,7 @@ void copy_warning(){
 }
 
 SEXP check_transform_altrep(SEXP x){
-  if (ALTREP(x)){
+  if (is_altrep(x)){
     Rf_warning("Cannot update an ALTREP by reference, a copy has been made. \n\tEnsure the result is assigned to an object if used in further calculations\n\te.g. `x <- set_abs(x)`");
     return altrep_materialise(x);
   } else {
@@ -22,19 +22,19 @@ SEXP check_transform_altrep(SEXP x){
   }
 }
 
-#define CHEAPR_MATH_INT_LOOP(FUN)                                         \
-for (R_xlen_t i = 0; i < n; ++i) {                                          \
-  p_out[i] = is_na_int(p_out[i]) ? p_out[i] : FUN(p_out[i]);           \
-}                                                                           \
-
-#define CHEAPR_MATH_REAL_LOOP(FUN)                                      \
+#define CHEAPR_MATH_LOOP(FUN)                                             \
 for (R_xlen_t i = 0; i < n; ++i) {                                        \
-  p_out[i] = is_na_dbl(p_out[i]) ? p_out[i] : FUN(p_out[i]);           \
+  p_out[i] = is_r_na(p_out[i]) ? p_out[i] : FUN(p_out[i]);                  \
 }                                                                         \
 
-
-#define CHEAPR_TRUNC(x) (std::trunc(x) + 0.0)
-#define CHEAPR_SIGN(x) ((x > 0) - (x < 0))
+#define CHEAPR_PARALLEL_MATH_LOOP(FUN)                         \
+if (n_cores > 1){                                              \
+  OMP_PARALLEL_FOR_SIMD                                        \
+  CHEAPR_MATH_LOOP(FUN);                                       \
+} else {                                                       \
+  OMP_FOR_SIMD                                                 \
+  CHEAPR_MATH_LOOP(FUN);                                       \
+}
 
 // Convert integer vector to plain double vector
 
@@ -44,7 +44,7 @@ SEXP convert_int_to_real(SEXP x){
   SEXP out = SHIELD(new_vec(REALSXP, n));
   double* RESTRICT p_out = REAL(out);
   for (int i = 0; i < n; ++i){
-    p_out[i] = is_na_int(p_x[i]) ? NA_REAL : static_cast<double>(p_x[i]);
+    p_out[i] = as_double(p_x[i]);
   }
   YIELD(1);
   return out;
@@ -59,25 +59,12 @@ SEXP cpp_set_abs(SEXP x){
   switch (TYPEOF(out)){
   case INTSXP: {
     int *p_out = INTEGER(out);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_MATH_INT_LOOP(std::abs);
-    } else {
-      OMP_FOR_SIMD
-      CHEAPR_MATH_INT_LOOP(std::abs);
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(std::abs)
     break;
   }
-  case REALSXP: {
+  default: {
     double *p_out = REAL(out);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_MATH_INT_LOOP(std::fabs);
-    }
-    else {
-      OMP_FOR_SIMD
-      CHEAPR_MATH_INT_LOOP(std::fabs);
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(std::abs)
     break;
   }
   }
@@ -93,13 +80,7 @@ SEXP cpp_set_floor(SEXP x){
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   if (Rf_isReal(out)){
     double *p_out = REAL(out);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(std::floor);
-    } else {
-      OMP_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(std::floor);
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(std::floor)
   }
   YIELD(1);
   return out;
@@ -113,13 +94,7 @@ SEXP cpp_set_ceiling(SEXP x){
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   if (Rf_isReal(out)){
     double *p_out = REAL(out);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(std::ceil);
-    } else {
-      OMP_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(std::ceil);
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(std::ceil)
   }
   YIELD(1);
   return out;
@@ -133,13 +108,7 @@ SEXP cpp_set_trunc(SEXP x){
   int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
   if (Rf_isReal(out)){
     double *p_out = REAL(out);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(CHEAPR_TRUNC);
-    } else {
-      OMP_FOR_SIMD
-      CHEAPR_MATH_REAL_LOOP(CHEAPR_TRUNC);
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(cheapr::trunc)
   }
   YIELD(1);
   return out;
@@ -154,33 +123,12 @@ SEXP cpp_set_change_sign(SEXP x){
   switch (TYPEOF(out)){
   case INTSXP: {
     int *p_out = INTEGER(out);
-    if (n_cores > 1){
-      OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == NA_INTEGER) ? p_out[i] : -p_out[i];
-      }
-    } else {
-      OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == NA_INTEGER) ? p_out[i] : -p_out[i];
-      }
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(cheapr::negate)
     break;
   }
   case REALSXP: {
     double *p_out = REAL(out);
-    if (n_cores > 1){
-      int n_cores = num_cores();
-      OMP_PARALLEL_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? -p_out[i] : p_out[i];
-      }
-    } else {
-      OMP_FOR_SIMD
-      for (R_xlen_t i = 0; i < n; ++i) {
-        p_out[i] = (p_out[i] == p_out[i]) ? -p_out[i] : p_out[i];
-      }
-    }
+    CHEAPR_PARALLEL_MATH_LOOP(cheapr::negate)
     break;
   }
   }
@@ -203,13 +151,7 @@ SEXP cpp_set_exp(SEXP x){
     out = SHIELD(check_transform_altrep(x));
   }
   double *p_out = REAL(out);
-  if (n_cores > 1){
-    OMP_PARALLEL_FOR_SIMD
-    CHEAPR_MATH_REAL_LOOP(std::exp);
-  } else {
-    OMP_FOR_SIMD
-    CHEAPR_MATH_REAL_LOOP(std::exp);
-  }
+  CHEAPR_PARALLEL_MATH_LOOP(std::exp)
   YIELD(1);
   return out;
 }
@@ -229,13 +171,7 @@ SEXP cpp_set_sqrt(SEXP x){
     out = SHIELD(check_transform_altrep(x));
   }
   double *p_out = REAL(out);
-  if (n_cores > 1){
-    OMP_PARALLEL_FOR_SIMD
-    CHEAPR_MATH_REAL_LOOP(std::sqrt);
-  } else {
-    OMP_FOR_SIMD
-    CHEAPR_MATH_REAL_LOOP(std::sqrt);
-  }
+  CHEAPR_PARALLEL_MATH_LOOP(std::sqrt)
   YIELD(1);
   return out;
 }
@@ -270,7 +206,7 @@ SEXP cpp_set_add(SEXP x, SEXP y){
     int *p_x = INTEGER(out);
     int *p_y = INTEGER(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_int(p_x[i]) || is_na_int(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ?
       NA_INTEGER : p_x[i] + p_y[yi];
     }
     break;
@@ -281,7 +217,7 @@ SEXP cpp_set_add(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_dbl(p_y[yi]))?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi]))?
       NA_REAL : p_x[i] + p_y[yi];
     }
     break;
@@ -296,7 +232,7 @@ SEXP cpp_set_add(SEXP x, SEXP y){
     double *p_x = REAL(out);
     int *p_y = INTEGER(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_int(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ?
       NA_REAL : p_x[i] + p_y[yi];
     }
     break;
@@ -305,7 +241,7 @@ SEXP cpp_set_add(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_dbl(p_y[yi])) ? NA_REAL : p_x[i] + p_y[yi];
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ? NA_REAL : p_x[i] + p_y[yi];
     }
     break;
   }
@@ -346,7 +282,7 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
     int *p_x = INTEGER(out);
     int *p_y = INTEGER(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_int(p_x[i]) || is_na_int(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ?
       NA_INTEGER : p_x[i] - p_y[yi];
     }
     break;
@@ -357,7 +293,7 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_dbl(p_y[yi]))?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi]))?
       NA_REAL : p_x[i] - p_y[yi];
     }
     break;
@@ -372,7 +308,7 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
     double *p_x = REAL(out);
     int *p_y = INTEGER(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_int(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ?
       NA_REAL : p_x[i] - p_y[yi];
     }
     break;
@@ -381,7 +317,7 @@ SEXP cpp_set_subtract(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_dbl(p_y[yi])) ? NA_REAL : p_x[i] - p_y[yi];
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ? NA_REAL : p_x[i] - p_y[yi];
     }
     break;
   }
@@ -433,7 +369,7 @@ SEXP cpp_set_multiply(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_dbl(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ?
       NA_REAL : p_x[i] * p_y[yi];
     }
     break;
@@ -448,7 +384,7 @@ SEXP cpp_set_multiply(SEXP x, SEXP y){
     double *p_x = REAL(out);
     int *p_y = INTEGER(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_int(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ?
       NA_REAL : p_x[i] * p_y[yi];
     }
     break;
@@ -457,7 +393,7 @@ SEXP cpp_set_multiply(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) ||is_na_dbl(p_y[yi])) ?
+      p_x[i] = (is_r_na(p_x[i]) ||is_r_na(p_y[yi])) ?
       NA_REAL : p_x[i] * p_y[yi];
     }
     break;
@@ -500,7 +436,7 @@ SEXP cpp_set_divide(SEXP x, SEXP y){
     double *p_x = REAL(out);
     int *p_y = INTEGER(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_int(p_y[yi])) ? NA_REAL : p_x[i] / p_y[yi];
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ? NA_REAL : p_x[i] / p_y[yi];
     }
     break;
   }
@@ -508,7 +444,7 @@ SEXP cpp_set_divide(SEXP x, SEXP y){
     double *p_x = REAL(out);
     double *p_y = REAL(y);
     for (uint_fast64_t i = 0; i < xn; yi = (++yi == yn) ? 0 : yi, ++i){
-      p_x[i] = (is_na_dbl(p_x[i]) || is_na_dbl(p_y[yi])) ? NA_REAL : p_x[i] / p_y[yi];
+      p_x[i] = (is_r_na(p_x[i]) || is_r_na(p_y[yi])) ? NA_REAL : p_x[i] / p_y[yi];
     }
     break;
   }
@@ -648,7 +584,7 @@ SEXP cpp_set_round(SEXP x, SEXP digits){
       double *p_x = REAL(out);
       const int *p_digits = INTEGER(digits);
         for (uint_fast64_t i = 0; i < xn; digitsi = (++digitsi == digitsn) ? 0 : digitsi, ++i) {
-          if ( (!is_na_dbl(p_x[i]) && !is_na_int(p_digits[digitsi])) ){
+          if ( (!is_r_na(p_x[i]) && !is_r_na(p_digits[digitsi])) ){
             tempx = p_x[i];
             mfactor = std::pow(10, p_digits[digitsi]);
             tempx *= mfactor;
@@ -665,7 +601,7 @@ SEXP cpp_set_round(SEXP x, SEXP digits){
       double *p_x = REAL(out);
       const double *p_digits = REAL(digits);
       for (uint_fast64_t i = 0; i < xn; digitsi = (++digitsi == digitsn) ? 0 : digitsi, ++i) {
-          if ( (!is_na_dbl(p_x[i]) && !is_na_dbl(p_digits[digitsi])) ){
+          if ( (!is_r_na(p_x[i]) && !is_r_na(p_digits[digitsi])) ){
             tempx = p_x[i];
             mfactor = std::pow(10, p_digits[digitsi]);
             tempx *= mfactor;
@@ -700,7 +636,7 @@ SEXP cpp_int_sign(SEXP x){
     const int *p_x = INTEGER(x);
     OMP_FOR_SIMD
     for (uint_fast64_t i = 0; i < n; ++i) {
-      p_out[i] = is_na_int(p_x[i]) ? NA_INTEGER : static_cast<int>(CHEAPR_SIGN(p_x[i]));
+      p_out[i] = is_r_na(p_x[i]) ? NA_INTEGER : sign(p_x[i]);
     }
     break;
   }
@@ -708,7 +644,7 @@ SEXP cpp_int_sign(SEXP x){
     double *p_x = REAL(x);
     OMP_FOR_SIMD
     for (uint_fast64_t i = 0; i < n; ++i) {
-      p_out[i] = is_na_dbl(p_x[i]) ? NA_INTEGER : static_cast<int>(CHEAPR_SIGN(p_x[i]));
+      p_out[i] = is_r_na(p_x[i]) ? NA_INTEGER : sign(p_x[i]);
     }
     break;
   }
@@ -716,3 +652,165 @@ SEXP cpp_int_sign(SEXP x){
   YIELD(1);
   return out;
 }
+
+// Math functions
+
+// I wanted to export these to C but there is an issue with C allocated R
+// vectors and the NAMED mechanism of reference counting
+// Vectors created through Rf_allocVector are not named when assigned
+// to a C SEXP
+// This means we can't use the MAYBE_REFERENCED functions safely in this case
+// These are also inefficient as R fns as they are doing an unnecessary loop
+
+// SEXP cpp_abs(SEXP x){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_abs(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+// SEXP cpp_floor(SEXP x){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_floor(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+// SEXP cpp_ceiling(SEXP x){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_ceiling(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+// SEXP cpp_trunc(SEXP x){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_trunc(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+// SEXP cpp_invert_sign(SEXP x){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_change_sign(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+// SEXP cpp_exp(SEXP x){
+//   int32_t NP = 0;
+//   SHIELD(x = cast<r_numeric_t>(x, R_NilValue)); ++NP;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_exp(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+// SEXP cpp_sqrt(SEXP x){
+//   int32_t NP = 0;
+//   SHIELD(x = cast<r_numeric_t>(x, R_NilValue)); ++NP;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_sqrt(x)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_log10(SEXP x){
+//   int32_t NP = 0;
+//   SHIELD(x = cast<r_numeric_t>(x, R_NilValue)); ++NP;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP log10 = SHIELD(as_r_scalar(10.0)); ++NP;
+//   SEXP out = SHIELD(cpp_set_log(x, log10)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_log(SEXP x, SEXP base){
+//   int32_t NP = 0;
+//   SHIELD(x = cast<r_numeric_t>(x, R_NilValue)); ++NP;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_log(x, base)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_round(SEXP x, SEXP digits){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_round(x, digits)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_pow(SEXP x, SEXP y){
+//   int32_t NP = 0;
+//   SHIELD(x = cast<r_numeric_t>(x, R_NilValue)); ++NP;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_pow(x, y)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_add(SEXP x, SEXP y){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_add(x, y)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_subtract(SEXP x, SEXP y){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_subtract(x, y)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_multiply(SEXP x, SEXP y){
+//   int32_t NP = 0;
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_multiply(x, y)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }
+//
+// SEXP cpp_divide(SEXP x, SEXP y){
+//   int32_t NP = 0;
+//
+//   SHIELD(x = cast<r_numeric_t>(x, R_NilValue)); ++NP;
+//
+//   if (MAYBE_REFERENCED(x)){
+//     SHIELD(x = Rf_duplicate(x)); ++NP;
+//   }
+//   SEXP out = SHIELD(cpp_set_divide(x, y)); ++NP;
+//   YIELD(NP);
+//   return out;
+// }

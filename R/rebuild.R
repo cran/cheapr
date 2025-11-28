@@ -26,41 +26,78 @@
 #' @rdname rebuild
 #' @export
 rebuild <- function(x, template, ...){
-  # Temporary piece of code to not break dependencies
-  if (inherits(template, c("episodes_tbl_df", "time_tbl_df"))){
-    old_class <- vec_intersect(class(template), c("episodes_tbl_df", "time_tbl_df"))
-    class(template) <- vec_setdiff(class(template), c("episodes_tbl_df", "time_tbl_df"))
-    out <- rebuild(x, template)
-
-    # Add extra attributes
-
-    extra_attrs <- list_drop_null(attributes(template)[c("time", "time_by", "threshold")])
-    attributes(out) <- c(attributes(out), extra_attrs)
-    class(out) <- c(old_class, class(out))
-    out
-  } else {
-    UseMethod("rebuild", template)
-  }
+  UseMethod("rebuild", template)
 }
-# rebuild.default <- function(x, template, shallow_copy = TRUE, ...){
-#   cpp_reconstruct(
-#     x, template, c("names", "dim", "dimnames", "row.names", "tsp", "comment"),
-#     cpp_setdiff(
-#       names(attributes(template)),
-#       c("names", "dim", "dimnames", "row.names", "tsp", "comment")
-#     ), shallow_copy
-#   )
-# }
 #' @rdname rebuild
 #' @export
 rebuild.data.frame <- function(x, template, shallow_copy = TRUE, ...){
-  .Call(`_cheapr_cpp_rebuild`, x, template, c("names", "row.names"), "class", shallow_copy)
+
+  names <- names(x)
+  row_names <- .set_row_names(length(attr(x, "row.names", TRUE)))
+
+  attrs_modify(
+    attrs_clear(x, .set = !shallow_copy),
+    names = names, row.names = row_names,
+    class = "data.frame", .set = TRUE
+  )
 }
 #' @rdname rebuild
 #' @export
 rebuild.data.table <- function(x, template, shallow_copy = TRUE, ...){
+
+  names <- names(x)
+  row_names <- .set_row_names(length(attr(x, "row.names", TRUE)))
+  sorted <- attr(x, "sorted", TRUE)
+
+  # qDT() will internally add a true length
   collapse::qDT(
-    cpp_rebuild(x, template, c("names", "row.names", "sorted"), "class", shallow_copy),
-    class = class(template)
+    attrs_modify(
+      attrs_clear(x, .set = !shallow_copy),
+      names = names, row.names = row_names, sorted = sorted,
+      class = c("data.table", "data.frame"),
+      .set = TRUE
+    )
   )
+}
+#' @rdname rebuild
+#' @export
+rebuild.tbl_df <- function(x, template, shallow_copy = TRUE, ...){
+
+  names <- names(x)
+  row_names <- .set_row_names(length(attr(x, "row.names", TRUE)))
+
+  attrs_modify(
+    attrs_clear(x, .set = !shallow_copy),
+    names = names, row.names = row_names,
+    class = c("tbl_df", "tbl", "data.frame"),
+    .set = TRUE
+  )
+}
+
+#' @rdname rebuild
+#' @export
+rebuild.sf <- function(x, template, shallow_copy = TRUE, ...){
+
+  target_attrs <- attributes(x)
+  source_attrs <- attributes(template)
+
+  keep_target <- c("names", "row.names")
+  keep_source <- vec_setdiff(names(source_attrs), keep_target)
+
+  # Keep the original order of attributes + additional attributes
+  out_attr_names <- c(
+    vec_intersect(names(target_attrs), c(keep_target, keep_source)),
+    vec_setdiff(keep_source, names(target_attrs))
+  )
+
+  # Keep at most these 2 class types
+  source_attrs[["class"]] <- vec_intersect(source_attrs[["class"]], c("sf", "data.frame"))
+
+  target_attrs <- sset(target_attrs, keep_target)
+  source_attrs <- sset(source_attrs, keep_source)
+
+  out_attrs <- list_modify(source_attrs, target_attrs) |>
+    sset(out_attr_names)
+
+  attrs_modify(x, .args = out_attrs)
 }

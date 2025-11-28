@@ -10,7 +10,9 @@
 #' values are `NA`, e.g. `str_coalesce(NA, NA)`.
 #'
 #' @param ... Character vectors to coalesce.
-#' @param .args An alternative to `...` for easier programming with lists.
+#' @param .args An alternative to `...` so you can supply arguments directly
+#' in a list. \cr
+#' This is equivalent to `do.call(f, .args)` but much more efficient.
 #'
 #' @returns
 #' A coalesced character vector of length corresponding to the recycled
@@ -43,7 +45,7 @@
 #'
 #' # Using `.args` instead of `do.call` is much more efficient
 #' library(bench)
-#' x <- cheapr_rep_len(list(letters), 10^3)
+#' x <- rep_len_(list(letters), 10^3)
 #'
 #' mark(do.call(str_coalesce, x),
 #'      str_coalesce(.args = x),

@@ -16,8 +16,20 @@ cpp_set_add_attributes <- function(x, attributes, add) {
   .Call(`_cheapr_cpp_set_add_attributes`, x, attributes, add)
 }
 
-rebuild <- function(x, source, shallow_copy) {
-  .Call(`_cheapr_rebuild`, x, source, shallow_copy)
+cpp_common_template <- function(x) {
+  .Call(`_cheapr_cpp_common_template`, x)
+}
+
+cpp_cast_common <- function(x) {
+  .Call(`_cheapr_cpp_cast_common`, x)
+}
+
+cpp_cast <- function(x, y) {
+  .Call(`_cheapr_cpp_cast`, x, y)
+}
+
+cpp_type <- function(x) {
+  .Call(`_cheapr_cpp_type`, x)
 }
 
 cpp_rep_len <- function(x, length) {
@@ -48,10 +60,6 @@ cpp_na_init <- function(x, n) {
   .Call(`_cheapr_cpp_na_init`, x, n)
 }
 
-cpp_combine_levels <- function(x) {
-  .Call(`_cheapr_cpp_combine_levels`, x)
-}
-
 cpp_list_c <- function(x) {
   .Call(`_cheapr_cpp_list_c`, x)
 }
@@ -64,12 +72,12 @@ cpp_c <- function(x) {
   .Call(`_cheapr_cpp_c`, x)
 }
 
-cpp_gcd2 <- function(x, y, tol, na_rm) {
-  .Call(`_cheapr_cpp_gcd2`, x, y, tol, na_rm)
+cpp_if_else <- function(condition, yes, no, na) {
+  .Call(`_cheapr_cpp_if_else`, condition, yes, no, na)
 }
 
-cpp_lcm2 <- function(x, y, tol, na_rm) {
-  .Call(`_cheapr_cpp_lcm2`, x, y, tol, na_rm)
+lcm2 <- function(x, y, tol, na_rm) {
+  .Call(`_cheapr_lcm2`, x, y, tol, na_rm)
 }
 
 cpp_gcd <- function(x, tol, na_rm, break_early, round) {
@@ -86,6 +94,14 @@ cpp_gcd2_vectorised <- function(x, y, tol, na_rm) {
 
 cpp_lcm2_vectorised <- function(x, y, tol, na_rm) {
   .Call(`_cheapr_cpp_lcm2_vectorised`, x, y, tol, na_rm)
+}
+
+cpp_group_starts <- function(group_id, n_groups) {
+  .Call(`_cheapr_cpp_group_starts`, group_id, n_groups)
+}
+
+cpp_group_counts <- function(group_id, n_groups) {
+  .Call(`_cheapr_cpp_group_counts`, group_id, n_groups)
 }
 
 cpp_int64_to_int <- function(x) {
@@ -106,6 +122,10 @@ cpp_numeric_to_int64 <- function(x) {
 
 cpp_format_numeric_as_int64 <- function(x) {
   .Call(`_cheapr_cpp_format_numeric_as_int64`, x)
+}
+
+cpp_sset_int64 <- function(x, locs) {
+  .Call(`_cheapr_cpp_sset_int64`, x, locs)
 }
 
 cpp_lag <- function(x, k, fill, set, recursive) {
@@ -140,16 +160,20 @@ cpp_list_assign <- function(x, values) {
   .Call(`_cheapr_cpp_list_assign`, x, values)
 }
 
-cpp_list_as_df <- function(x) {
-  .Call(`_cheapr_cpp_list_as_df`, x)
-}
-
 cpp_new_df <- function(x, nrows, recycle, name_repair) {
   .Call(`_cheapr_cpp_new_df`, x, nrows, recycle, name_repair)
 }
 
+cpp_list_as_df <- function(x) {
+  .Call(`_cheapr_cpp_list_as_df`, x)
+}
+
 cpp_df_assign_cols <- function(x, cols) {
   .Call(`_cheapr_cpp_df_assign_cols`, x, cols)
+}
+
+cpp_as_df <- function(x) {
+  .Call(`_cheapr_cpp_as_df`, x)
 }
 
 cpp_num_na <- function(x, recursive) {
@@ -200,6 +224,10 @@ cpp_col_na_counts <- function(x, names) {
   .Call(`_cheapr_cpp_col_na_counts`, x, names)
 }
 
+cpp_replace <- function(x, where, with, in_place, quiet) {
+  .Call(`_cheapr_cpp_replace`, x, where, with, in_place, quiet)
+}
+
 cpp_count_val <- function(x, value, recursive) {
   .Call(`_cheapr_cpp_count_val`, x, value, recursive)
 }
@@ -208,20 +236,16 @@ cpp_val_replace <- function(x, value, replace, recursive) {
   .Call(`_cheapr_cpp_val_replace`, x, value, replace, recursive)
 }
 
-cpp_val_set_replace <- function(x, value, replace, recursive) {
-  .Call(`_cheapr_cpp_val_set_replace`, x, value, replace, recursive)
-}
-
-cpp_loc_set_replace <- function(x, where, what) {
-  .Call(`_cheapr_cpp_loc_set_replace`, x, where, what)
-}
-
 cpp_val_remove <- function(x, value) {
   .Call(`_cheapr_cpp_val_remove`, x, value)
 }
 
-cpp_sequence <- function(size, from, by) {
-  .Call(`_cheapr_cpp_sequence`, size, from, by)
+cpp_sequence_id <- function(size) {
+  .Call(`_cheapr_cpp_sequence_id`, size)
+}
+
+cpp_sequence <- function(size, from, by, as_list, add_id) {
+  .Call(`_cheapr_cpp_sequence`, size, from, by, as_list, add_id)
 }
 
 cpp_window_sequence <- function(size, k, partial, ascending) {
@@ -234,10 +258,6 @@ cpp_lag_sequence <- function(size, k, partial) {
 
 cpp_lead_sequence <- function(size, k, partial) {
   .Call(`_cheapr_cpp_lead_sequence`, size, k, partial)
-}
-
-cpp_sequence_id <- function(size) {
-  .Call(`_cheapr_cpp_sequence_id`, size)
 }
 
 cpp_fixed_width_breaks <- function(start, end, n, pretty, expand_min, expand_max) {
@@ -320,8 +340,20 @@ cpp_df_subset <- function(x, i, j, check) {
   .Call(`_cheapr_cpp_df_subset`, x, i, j, check)
 }
 
+cpp_sset2 <- function(x, i, j, check, args) {
+  .Call(`_cheapr_cpp_sset2`, x, i, j, check, args)
+}
+
 cpp_sset <- function(x, indices, check) {
   .Call(`_cheapr_cpp_sset`, x, indices, check)
+}
+
+cpp_str_coalesce <- function(x) {
+  .Call(`_cheapr_cpp_str_coalesce`, x)
+}
+
+cpp_paste <- function(x, sep, collapse) {
+  .Call(`_cheapr_cpp_paste`, x, sep, collapse)
 }
 
 cpp_is_simple_atomic_vec <- function(x) {
@@ -364,10 +396,6 @@ cpp_bin <- function(x, breaks, codes, right, include_lowest, include_oob) {
   .Call(`_cheapr_cpp_bin`, x, breaks, codes, right, include_lowest, include_oob)
 }
 
-cpp_if_else <- function(condition, yes, no, na) {
-  .Call(`_cheapr_cpp_if_else`, condition, yes, no, na)
-}
-
 cpp_lgl_count <- function(x) {
   .Call(`_cheapr_cpp_lgl_count`, x)
 }
@@ -388,12 +416,12 @@ cpp_rebuild <- function(target, source, target_attr_names, source_attr_names, sh
   .Call(`_cheapr_cpp_rebuild`, target, source, target_attr_names, source_attr_names, shallow_copy)
 }
 
-cpp_str_coalesce <- function(x) {
-  .Call(`_cheapr_cpp_str_coalesce`, x)
-}
-
 cpp_tabulate <- function(x, n_bins) {
   .Call(`_cheapr_cpp_tabulate`, x, n_bins)
+}
+
+cpp_is_whole_number <- function(x, tol_, na_rm_) {
+  .Call(`_cheapr_cpp_is_whole_number`, x, tol_, na_rm_)
 }
 
 cpp_which_ <- function(x, invert) {

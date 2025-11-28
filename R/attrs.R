@@ -9,7 +9,9 @@
 #' @param ... Named attributes, e.g 'key = value'.
 #' @param .set Should attributes be added in-place without shallow-copying `x`?
 #' Default is `FALSE`.
-#' @param .args An alternative to `...` for easier programming with lists.
+#' @param .args An alternative to `...` so you can supply arguments directly
+#' in a list. \cr
+#' This is equivalent to `do.call(f, .args)` but much more efficient.
 #'
 #' @seealso [shallow_copy]
 #'
@@ -24,12 +26,12 @@ attrs_modify <- function(x, ..., .set = FALSE, .args = NULL){
   if (.set){
     .Call( `_cheapr_cpp_set_add_attributes`, x, .Call(`_cheapr_cpp_list_args`, list(...), .args), TRUE)
   } else {
-    `attributes<-`(
-      x, list_assign(
-        attributes(x) %||% list(),
-        .Call(`_cheapr_cpp_list_args`, list(...), .args)
-      )
+    out <- x
+    attributes(out) <- list_modify(
+      attributes(x) %||% list(),
+      .Call(`_cheapr_cpp_list_args`, list(...), .args)
     )
+    out
   }
 }
 #' @rdname attrs
@@ -41,7 +43,8 @@ attrs_clear <- function(x, .set = FALSE){
   if (.set){
     .Call(`_cheapr_cpp_set_rm_attributes`, x)
   } else {
-    `attributes<-`(x, NULL)
+    attributes(x) <- NULL
+    x
   }
 }
 #' @rdname attrs

@@ -10,7 +10,7 @@
 #' @param .x Vector used to switch values.
 #' @param .default Catch-all value or vector.
 #'
-#' @seealso [cheapr_if_else]
+#' @seealso [if_else_]
 #'
 #' @returns
 #' A vector the same length as `.x` or same length as the first condition in the
@@ -43,7 +43,7 @@
 #' @export
 case <- function(..., .default = NULL){
   conditions <- exprs(...)
-  default_val <- .default
+  force(.default)
   n_conditions <- length(conditions)
 
   if (n_conditions == 0){
@@ -59,22 +59,34 @@ case <- function(..., .default = NULL){
   if (as.character(condition[[1L]]) != "~" || length(condition) != 3){
     stop("Please supply formula expressions")
   }
-  rhs <- eval(condition[[3L]], envir = parent.frame())
-  rhs_list[[1L]] <- rhs
+
+  # Deal with RHS values
+  for (i in seq_along(conditions)){
+    rhs_list[[i]] <- eval(conditions[[i]][[3]], envir = parent.frame())
+  }
+
+  if (is.null(.default)){
+    rhs_list <- cast_common(.args = rhs_list)
+  } else {
+    rhs_common <- cast_common(.args = c_(rhs_list, list(.default)))
+    rhs_list <- rhs_common[seq_along(rhs_list)]
+    .default <- rhs_common[[length(rhs_common)]]
+  }
 
   lgl <- eval(condition[[2L]], envir = parent.frame())
   if (!is.logical(lgl)){
     stop("All LHS expressions must be logical vectors")
   }
 
+  rhs <- rhs_list[[1]]
   if (length(lgl) == 0){
-    return(rhs[0L])
+    return(sset(rhs, 0))
   }
 
-  if (length(lgl) < length(rhs)){
-    lgl <- cheapr_rep_len(lgl, length(rhs))
+  if (length(lgl) < vector_length(rhs)){
+    lgl <- rep_len_(lgl, vector_length(rhs))
   }
-  if (!length(rhs) %in% c(1, length(lgl))){
+  if (!vector_length(rhs) %in% c(1, length(lgl))){
     stop("rhs must be of length 1 or length of lhs")
   }
 
@@ -82,12 +94,12 @@ case <- function(..., .default = NULL){
 
   true_locs <- val_find(lgl, TRUE)
 
+  out <- na_init(rhs, out_size)
+
   if (length(rhs) == 1){
-    out <- rep(rhs[NA_integer_], length.out = out_size)
-    out[true_locs] <- rhs
+    out <- .Call(`_cheapr_cpp_replace`, out, true_locs, rhs, FALSE, FALSE)
   } else {
-    out <- rhs
-    out[true_locs] <- rhs[true_locs]
+    out <- .Call(`_cheapr_cpp_replace`, out, true_locs, sset(rhs, true_locs), FALSE, FALSE)
   }
 
   # Initialise a logical that will keep track of
@@ -102,15 +114,15 @@ case <- function(..., .default = NULL){
       if (as.character(condition[[1L]]) != "~" || length(condition) != 3){
         stop("Please supply formula expressions")
       }
-      rhs <- eval(condition[[3L]], envir = parent.frame())
+      rhs <- rhs_list[[i]]
       lgl <- eval(condition[[2L]], envir = parent.frame())
 
       if (!is.logical(lgl)){
         stop("All LHS expressions must be logical vectors")
       }
 
-      lgl <- cheapr_rep_len(lgl, out_size)
-      if (!length(rhs) %in% c(1, out_size)){
+      lgl <- rep_len_(lgl, out_size)
+      if (!vector_length(rhs) %in% c(1, out_size)){
         stop("rhs must be of length 1 or length of lhs")
       }
 
@@ -120,34 +132,33 @@ case <- function(..., .default = NULL){
       # 3. Do `lgl_or | lgl` to keep track of evaluated `TRUE` elements
 
       cpp_set_copy_elements(source = lgl, target = lgl3)
-      cpp_loc_set_replace(lgl3, val_find(lgl_or, TRUE), FALSE)
+      replace_(lgl3, val_find(lgl_or, TRUE), FALSE, in_place = TRUE, quiet = TRUE)
       cpp_set_or(lgl_or, lgl)
 
       true_locs <- val_find(lgl3, TRUE)
       if (length(true_locs) > 0){
-        if (length(rhs) == 1){
-          out[true_locs] <- rhs
+        if (vector_length(rhs) == 1){
+          out <- .Call(`_cheapr_cpp_replace`, out, true_locs, rhs, FALSE, FALSE)
         } else {
-          out[true_locs] <- rhs[true_locs]
+          out <- .Call(`_cheapr_cpp_replace`, out, true_locs, sset(rhs, true_locs), FALSE, FALSE)
         }
       }
     }
   }
 
+  if (!is.null(.default)){
 
-  if (!is.null(default_val)){
-
-    if (!length(default_val) %in% c(1, out_size)){
+    if (!vector_length(.default) %in% c(1, out_size)){
       stop("rhs must be of length 1 or length of lhs")
     }
 
     default_locs <- val_find(lgl_or, TRUE, invert = TRUE)
 
-    if (length(default_locs) > 0){
-      if (length(default_val) == 1){
-        out[default_locs] <- default_val
+    if (vector_length(default_locs) > 0){
+      if (vector_length(.default) == 1){
+        out <- .Call(`_cheapr_cpp_replace`, out, default_locs, .default, FALSE, FALSE)
       } else {
-        out[default_locs] <- default_val[default_locs]
+        out <- .Call(`_cheapr_cpp_replace`, out, default_locs, sset(.default, default_locs), FALSE, FALSE)
       }
     }
 
@@ -218,7 +229,7 @@ val_match <- function(.x, ..., .default = NULL){
   if (rhs_all_scalars && (n_exprs > 3 || !all_same_type)){
 
     # Pre-allocate key-value pairs
-      keys <- cheapr_rep_len(.x[NA_integer_], n_exprs)
+      keys <- rep_len_(.x[NA_integer_], n_exprs)
       values <- keys
 
       # Assign keys and values
@@ -249,12 +260,12 @@ val_match <- function(.x, ..., .default = NULL){
     # Create a vector filled with `.default` if given, otherwise NA
 
     if (!is.null(.default)){
-      out <- if (length(.default) != 1) .default else cheapr_rep_len(.default, N)
+      out <- if (length(.default) != 1) .default else rep_len_(.default, N)
     } else {
       if (n_exprs == 0){
-        out <- cheapr_rep_len(.x[NA_integer_], N)
+        out <- rep_len_(.x[NA_integer_], N)
       } else {
-        out <- cheapr_rep_len(rhs_list[[1L]][NA_integer_], N)
+        out <- rep_len_(rhs_list[[1L]][NA_integer_], N)
       }
     }
 

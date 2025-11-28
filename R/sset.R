@@ -1,12 +1,14 @@
-#' Cheaper subset
+#' Cheaper subset `sset()`
 #'
 #' @description
-#' Cheaper alternative to `[` that consistently subsets data frame
-#' rows, always returning a data frame. There are explicit methods for
-#' enhanced data frames like tibbles, data.tables and sf.
+#'
+#' `sset()` is a cheaper alternative to `[`.
+#'
+#' It consistently subsets data frame rows for any data frame class including
+#' tibble and data.table.
 #'
 #' @param x Vector or data frame.
-#' @param i A logical or vector of indices. \cr
+#' @param i A logical vector or integer vector of locations.
 #' @param j Column indices, names or logical vector.
 #' @param ... Further parameters passed to `[`.
 #'
@@ -14,12 +16,17 @@
 #' A new vector, data frame, list, matrix or other R object.
 #'
 #' @details
-#' `sset` is an S3 generic.
-#' You can either write methods for `sset` or `[`. \cr
-#' `sset` will fall back on using `[` when no suitable method is found.
 #'
-#' To get into more detail, using `sset()` on a data frame, a new
-#' list is always allocated through `new_list()`.
+#' ### S3 dispatching
+#' `sset` will internally dispatch the correct method and
+#' will call `[` if it can't find an appropriate method. This means
+#' one can define their own `[` method for custom S3 objects.
+#'
+#' To speed up subsetting for common objects likes Dates and `POSIXlt`
+#' an internal generic function is used which overwrites the `[` method for
+#' that common object. This is why subsetting `POSIXlt` is much faster with
+#' `sset` an internal method has been defined. For more details see the code
+#' for `cheapr:::cheapr_sset`.
 #'
 #' ### Difference to base R
 #'
@@ -32,8 +39,8 @@
 #'
 #' When `i` is an ALTREP compact sequence which can be commonly created
 #' using e.g. `1:10` or using `seq_len`, `seq_along` and `seq.int`,
-#' `sset` internally uses a range-based subsetting method which is faster and doesn't
-#' allocate `i` into memory.
+#' `sset` internally uses a range-based subsetting method
+#' which is faster and doesn't allocate `i` into memory.
 #'
 #' @examples
 #' library(cheapr)
@@ -64,35 +71,40 @@
 #'
 #' @rdname sset
 #' @export
-sset <- function(x, ...){
-  UseMethod("sset")
+sset <- function(x, i = NULL, j = NULL, ...){
+  .Call(`_cheapr_cpp_sset2`, x, i, j, TRUE, list(...))
+}
+cheapr_sset <- function(x, ...){
+  UseMethod("cheapr_sset")
 }
 #' @export
-sset.default <- function(x, i, ...){
-  if (.Call(`_cheapr_cpp_is_simple_vec`, x) && n_dots(...) == 0L){
-    .Call(`_cheapr_cpp_sset`, x, if (missing(i)) seq_len(vector_length(x)) else i, TRUE)
-  } else {
-    if (!missing(i) && is.logical(i)){
-      check_length(i, length(x))
-      i <- which_(i)
-    }
-    x[i, ...]
+cheapr_sset.default <- function(x, i = NULL, j = NULL, ...){
+  if (is.logical(i)){
+    check_length(i, length(x))
+    i <- which_(i)
+  }
+  if (is.null(i) && is.null(j)){
+    x[...]
+  } else if (is.null(j)){
+    x[i = i, ...]
+  } else if (is.null(i)){
+    x[j = j, ...]
+    } else {
+    x[i = i, j = j, ...]
   }
 }
-#' @rdname sset
 #' @export
-sset.data.frame <- function(x, i = NULL, j = NULL, ...){
-  .Call(`_cheapr_cpp_df_subset`, x, i, j, TRUE)
+cheapr_sset.data.frame <- function(x, i = NULL, j = NULL, ...){
+  sset_df(x, i, j, ...)
 }
-#' @rdname sset
 #' @export
-sset.POSIXlt <- function(x, i = NULL, j = NULL, ...){
+cheapr_sset.POSIXlt <- function(x, i = NULL, j = NULL, ...){
   missingj <- is.null(j)
   out <- fill_posixlt(x, classed = FALSE)
   if (missingj){
     j <- seq_along(out)
   }
-  out <- sset_df(list_as_df(out), i , j)
+  out <- sset(list_as_df(out), i, j)
   if (missingj){
     attrs_add(out, class = class(x), row.names = NULL, .set = TRUE)
   }
@@ -104,38 +116,23 @@ sset.POSIXlt <- function(x, i = NULL, j = NULL, ...){
   }
   out
 }
-#' @rdname sset
+# Have to define sf method because otherwise `cheapr_sset.data.frame` is called
+# which can't handle 'sf_column' correctly
 #' @export
-sset.sf <- function(x, i = NULL, j = NULL, ...){
-  out <- sset_df(x, i, j)
-  cpp_rebuild(
-    out, x, c("names", "row.names"), vec_setdiff(names(attributes(x)), c("names", "row.names")), FALSE
-  )
+cheapr_sset.sf <- function(x, i = NULL, j = NULL, ...){
+  cheapr_sset.default(x, i, j, ...)
 }
 #' @export
-sset.vctrs_rcrd <- function(x, i = NULL, ...){
-  .Call(
-    `_cheapr_cpp_set_add_attributes`,
-    sset_row(list_as_df(x), i), shallow_copy(attributes(x)), FALSE
-  )
+cheapr_sset.vctrs_rcrd <- function(x, i = NULL, ...){
+  x |>
+    list_as_df() |>
+    sset(i) |>
+    attrs_clear(.set = TRUE) |>
+    attrs_modify(.args = shallow_copy(attributes(x)), .set = TRUE)
 }
 
-na_int64 <- unserialize(as.raw(c(
-  0x58, 0x0a, 0x00, 0x00, 0x00, 0x02, 0x00, 0x03, 0x03, 0x00, 0x00, 0x02, 0x03, 0x00, 0x00, 0x00,
-  0x03, 0x0e, 0x00, 0x00, 0x00, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x04, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 0x00, 0x09, 0x00, 0x00, 0x00, 0x05, 0x63, 0x6c,
-  0x61, 0x73, 0x73, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 0x00, 0x09, 0x00,
-  0x00, 0x00, 0x09, 0x69, 0x6e, 0x74, 0x65, 0x67, 0x65, 0x72, 0x36, 0x34, 0x00, 0x00, 0x00, 0xfe
-)))
-
 #' @export
-sset.integer64 <- function(x, i = NULL, ...){
-  out <- cpp_sset(unclass(x), if (is.null(i)) seq_along(x) else i, TRUE)
-  out[na_find(out)] <- na_int64
-
-  attrs_add(
-    out,
-    .args = shallow_copy(attributes(x)),
-    .set = TRUE
-  )
+cheapr_sset.integer64 <- function(x, i = NULL, ...){
+  cpp_sset_int64(x, i) |>
+    attrs_modify(class = "integer64", .set = TRUE)
 }

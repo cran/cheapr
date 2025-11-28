@@ -3,15 +3,24 @@
 \name{rep}
 \alias{rep}
 \alias{cheapr_rep}
+\alias{rep_}
 \alias{cheapr_rep_len}
+\alias{rep_len_}
 \alias{cheapr_rep_each}
+\alias{rep_each_}
 \title{cheapr style repeat functions}
 \usage{
 cheapr_rep(x, times)
 
+rep_(x, times)
+
 cheapr_rep_len(x, length)
 
+rep_len_(x, length)
+
 cheapr_rep_each(x, each)
+
+rep_each_(x, each)
 }
 \arguments{
 \item{x}{A vector or data frame.}
@@ -21,7 +30,7 @@ or the same length as \code{vector_length(x)}.}
 
 \item{length}{\verb{[integer(1)]} - Length of the recycled result.}
 
-\item{each}{\verb{[integer(1)]} - How many times to repeat out each element of \code{x}.}
+\item{each}{\verb{[integer(n)]} - How many times to repeat out each element of \code{x}.}
 }
 \value{
 Repeated out object.

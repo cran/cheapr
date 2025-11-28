@@ -1,5 +1,7 @@
 #' Cheaper version of `ifelse()`
 #'
+#' @name if_else
+#'
 #' @param condition [logical] A condition which will be used to
 #' evaluate the if else operation.
 #' @param true Value(s) to replace `TRUE` instances.
@@ -11,46 +13,32 @@
 #'
 #' @returns
 #' A vector the same length as condition,
-#' using a common type between `true`, `false` and `default`.
+#' using a common type between `true`, `false` and `na`.
 #'
+#' @rdname if_else
 #' @export
-cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
+if_else_ <- function(condition, true, false, na = NULL){
+  .Call(`_cheapr_cpp_if_else`, condition, true, false, na)
+}
+#' @rdname if_else
+#' @export
+cheapr_if_else <- if_else_
 
-  if (!is.logical(condition)){
-    stop("condition must be a logical vector")
-  }
-  if (length(true) != 1 && length(true) != length(condition)){
+# Internal function, do not use
+# Assumes true, false, and na are similar types/classes
+if_else2 <- function(condition, true, false, na){
+
+  n <- length(condition)
+
+  if (length(true) != 1 && length(true) != n){
     stop("`length(true)` must be 1 or `length(condition)`")
   }
-  if (length(false) != 1 && length(false) != length(condition)){
+  if (length(false) != 1 && length(false) != n){
     stop("`length(false)` must be 1 or `length(condition)`")
   }
-  if (length(na) != 1 && length(na) != length(condition)){
+  if (length(na) != 1 && length(na) != n){
     stop("`length(na)` must be 1 or `length(condition)`")
   }
-
-  if (is.factor(true) || is.factor(false) || is.factor(na)){
-    template_lvls <- cpp_combine_levels(list(true[1L], false[1L], na[1L]))
-    true <- factor_(true, levels = template_lvls)
-    false <- factor_(false, levels = template_lvls)
-    na <- factor_(na, levels = template_lvls)
-    template <- true
-  } else {
-    template <- c(true[1L], false[1L], na[1L])[0L]
-    true <- cast(true, template)
-    false <- cast(false, template)
-    na <- cast(na, template)
-  }
-
-
-  if (cpp_is_simple_vec(true) && cpp_is_simple_vec(false) && cpp_is_simple_vec(na)){
-    return(`mostattributes<-`(
-      cpp_if_else(condition, true, false, na),
-      attributes(template)
-    ))
-  }
-
-  # Catch-all method
 
   lgl_val_counts <- cpp_lgl_count(condition)
   n_true <- lgl_val_counts["true"]
@@ -59,7 +47,7 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
 
   if (n_true == length(condition)){
     if (length(true) == 1){
-      return(rep(true, length(condition)))
+      return(rep_len(true, length(condition)))
     } else {
       return(true)
     }
@@ -67,7 +55,7 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
 
   if (n_false == length(condition)){
     if (length(false) == 1){
-      return(rep(false, length(condition)))
+      return(rep_len(false, length(condition)))
     } else {
       return(false)
     }
@@ -75,7 +63,7 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
 
   if (n_na == length(condition)){
     if (length(na) == 1){
-      return(rep(na, length(condition)))
+      return(rep_len(na, length(condition)))
     } else {
       return(na)
     }
@@ -85,7 +73,7 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
   if (length(false) == length(condition)){
     out <- false
   } else {
-    out <- rep(false, length.out = length(condition))
+    out <- rep_len(false, length(condition))
   }
 
   lgl_locs <- cpp_lgl_locs(condition, n_true = n_true, n_false = n_false,
@@ -106,3 +94,4 @@ cheapr_if_else <- function(condition, true, false, na = false[NA_integer_]){
   }
   out
 }
+

@@ -13,7 +13,9 @@
 #' duplicate column names and their locations. Default is `'_'`
 #' @param empty_sep `[character(1)]` A separator to use between the empty
 #' column names and their locations. Default is `'col_'`
-#' @param .args An alternative to `...` for easier programming with lists.
+#' @param .args An alternative to `...` so you can supply arguments directly
+#' in a list. \cr
+#' This is equivalent to `do.call(f, .args)` but much more efficient.
 #' @param cols A list of values to add or modify data frame `x`.
 #'
 #' @returns
@@ -35,30 +37,12 @@ new_df <- function(..., .nrows = NULL, .recycle = TRUE, .name_repair = TRUE, .ar
 }
 #' @rdname data_frame
 #' @export
-as_df <- function(x){
-  if (inherits(x, "data.frame")){
-    return(cpp_new_df(x, length(attr(x, "row.names")), FALSE, FALSE))
-  } else if (is.null(x) || (is.atomic(x) && length(dim(x)) < 2)){
-    out <- list_drop_null(list(name = names(x), value = x))
-    attr(out, "row.names") <- .set_row_names(NROW(x))
-    class(out) <- "data.frame"
-    return(out)
-  } else {
-    # Plain list
-    if (!is.object(x) && is.list(x)){
-      return(new_df(.args = x, .recycle = TRUE, .name_repair = TRUE))
-    } else {
-      out <- as.data.frame(x, stringsAsFactors = FALSE)
-      names(out) <- str_coalesce(names(out), paste0("col_", seq_along(out)))
-      return(out)
-    }
-  }
-}
+as_df <- cpp_as_df
 
 #' @rdname data_frame
 #' @export
 fast_df <- function(..., .args = NULL){
-  .Call(`_cheapr_cpp_list_as_df`, .Call(`_cheapr_cpp_list_args`, list(...), .args))
+  .Call(`_cheapr_cpp_new_df`, .Call(`_cheapr_cpp_list_args`, list(...), .args), NULL, FALSE, FALSE)
 }
 
 #' @rdname data_frame
@@ -67,7 +51,9 @@ df_modify <- cpp_df_assign_cols
 
 #' @rdname data_frame
 #' @export
-list_as_df <- cpp_list_as_df
+list_as_df <- function(x){
+  .Call(`_cheapr_cpp_new_df`, x, NULL, FALSE, FALSE)
+}
 
 #' @rdname data_frame
 #' @export

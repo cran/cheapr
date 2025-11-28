@@ -2,43 +2,42 @@
 % Please edit documentation in R/sset.R
 \name{sset}
 \alias{sset}
-\alias{sset.data.frame}
-\alias{sset.POSIXlt}
-\alias{sset.sf}
-\title{Cheaper subset}
+\title{Cheaper subset \code{sset()}}
 \usage{
-sset(x, ...)
-
-\method{sset}{data.frame}(x, i = NULL, j = NULL, ...)
-
-\method{sset}{POSIXlt}(x, i = NULL, j = NULL, ...)
-
-\method{sset}{sf}(x, i = NULL, j = NULL, ...)
+sset(x, i = NULL, j = NULL, ...)
 }
 \arguments{
 \item{x}{Vector or data frame.}
 
-\item{...}{Further parameters passed to \code{[}.}
-
-\item{i}{A logical or vector of indices. \cr}
+\item{i}{A logical vector or integer vector of locations.}
 
 \item{j}{Column indices, names or logical vector.}
+
+\item{...}{Further parameters passed to \code{[}.}
 }
 \value{
 A new vector, data frame, list, matrix or other R object.
 }
 \description{
-Cheaper alternative to \code{[} that consistently subsets data frame
-rows, always returning a data frame. There are explicit methods for
-enhanced data frames like tibbles, data.tables and sf.
+\code{sset()} is a cheaper alternative to \code{[}.
+
+It consistently subsets data frame rows for any data frame class including
+tibble and data.table.
 }
 \details{
-\code{sset} is an S3 generic.
-You can either write methods for \code{sset} or \code{[}. \cr
-\code{sset} will fall back on using \code{[} when no suitable method is found.
+\subsection{S3 dispatching}{
 
-To get into more detail, using \code{sset()} on a data frame, a new
-list is always allocated through \code{new_list()}.
+\code{sset} will internally dispatch the correct method and
+will call \code{[} if it can't find an appropriate method. This means
+one can define their own \code{[} method for custom S3 objects.
+
+To speed up subsetting for common objects likes Dates and \code{POSIXlt}
+an internal generic function is used which overwrites the \code{[} method for
+that common object. This is why subsetting \code{POSIXlt} is much faster with
+\code{sset} an internal method has been defined. For more details see the code
+for \code{cheapr:::cheapr_sset}.
+}
+
 \subsection{Difference to base R}{
 
 When \code{i} is a logical vector, it is passed directly to \code{which_()}. \cr
@@ -51,8 +50,8 @@ matches the length of x. To return \code{NA} values, use \code{sset(x, NA_intege
 
 When \code{i} is an ALTREP compact sequence which can be commonly created
 using e.g. \code{1:10} or using \code{seq_len}, \code{seq_along} and \code{seq.int},
-\code{sset} internally uses a range-based subsetting method which is faster and doesn't
-allocate \code{i} into memory.
+\code{sset} internally uses a range-based subsetting method
+which is faster and doesn't allocate \code{i} into memory.
 }
 }
 \examples{

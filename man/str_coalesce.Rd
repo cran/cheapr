@@ -9,7 +9,9 @@ str_coalesce(..., .args = NULL)
 \arguments{
 \item{...}{Character vectors to coalesce.}
 
-\item{.args}{An alternative to \code{...} for easier programming with lists.}
+\item{.args}{An alternative to \code{...} so you can supply arguments directly
+in a list. \cr
+This is equivalent to \code{do.call(f, .args)} but much more efficient.}
 }
 \value{
 A coalesced character vector of length corresponding to the recycled
@@ -51,7 +53,7 @@ str_coalesce(x, y)
 
 # Using `.args` instead of `do.call` is much more efficient
 library(bench)
-x <- cheapr_rep_len(list(letters), 10^3)
+x <- rep_len_(list(letters), 10^3)
 
 mark(do.call(str_coalesce, x),
      str_coalesce(.args = x),

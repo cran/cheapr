@@ -133,7 +133,7 @@ factor_ <- function(
       class(out) <- c(if (ordered) "ordered" else character(), "factor")
       return(out)
     }
-    lvls <- collapse::funique(x, sort = order, na.last = TRUE)
+    lvls <- unique_(x, sort = order)
   } else {
     lvls <- levels
   }
@@ -185,7 +185,7 @@ check_is_factor <- function(x){
   }
 }
 factor_as_character <- function(x){
-  levels(x)[unclass(x)]
+  sset(levels(x), unclass(x))
 }
 which_used_levels <- function(x){
   which_in(levels_factor(x), x)
@@ -196,12 +196,12 @@ which_unused_levels <- function(x){
 #' @rdname factors
 #' @export
 levels_used <- function(x){
-  levels(x)[which_used_levels(x)]
+  sset(levels(x), which_used_levels(x))
 }
 #' @rdname factors
 #' @export
 levels_unused <- function(x){
-  levels(x)[which_unused_levels(x)]
+  sset(levels(x), which_unused_levels(x))
 }
 #' @rdname factors
 #' @export
@@ -229,7 +229,7 @@ levels_add <- function(x, levels, where = c("last", "first")){
     x
   } else {
     add <- which_not_in(levels, x_lvls)
-    levels_to_add <- levels[add]
+    levels_to_add <- sset(levels, add)
     if (where == "first"){
       out_lvls <- c(levels_to_add, x_lvls)
     } else {
@@ -355,7 +355,7 @@ levels_lump <- function(x, n, prop, other_category = "Other",
   check_length(n, 1)
   ties <- match.arg(ties)
   check_length(other_category, 1)
-  counts <- cheapr_table(x, names = FALSE)
+  counts <- table_(x, names = FALSE)
 
   # Order counts
   o <- order(counts, decreasing = (n >= 0))
