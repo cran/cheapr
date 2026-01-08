@@ -5,7 +5,7 @@ test_that("GCD AND SCM scalars", {
   expect_identical(gcd(0L), 0L)
   expect_identical(gcd(NaN), NaN)
   expect_identical(gcd(Inf), Inf)
-  expect_identical(gcd(-Inf), -Inf)
+  expect_identical(gcd(-Inf), Inf)
   expect_identical(gcd(NA_integer_, na_rm = TRUE), NA_integer_)
   expect_identical(gcd(NA_integer_, na_rm = FALSE), NA_integer_)
   expect_identical(gcd(NA_real_, na_rm = TRUE), NA_real_)
@@ -73,8 +73,8 @@ test_that("Small vectors (integers)", {
 
   expect_identical(gcd(c(0, Inf)), Inf)
   expect_identical(gcd(c(Inf, 0)), Inf)
-  expect_identical(gcd(c(0, -Inf)), -Inf)
-  expect_identical(gcd(c(-Inf, 0)), -Inf)
+  expect_identical(gcd(c(0, -Inf)), Inf)
+  expect_identical(gcd(c(-Inf, 0)), Inf)
   expect_identical(scm(c(0, Inf)), NaN)
   expect_identical(scm(c(Inf, 0)), NaN)
   expect_identical(scm(c(0, -Inf)), NaN)
@@ -146,17 +146,17 @@ test_that("signs", {
   d <- -b
   expect_identical(gcd(a), 5L)
   expect_identical(gcd(b), 5)
-  expect_identical(gcd(c), -5L)
-  expect_identical(gcd(d), -5)
+  expect_identical(gcd(c), 5L)
+  expect_identical(gcd(d), 5)
 })
 
 test_that("Overflow", {
   expect_equal(scm(1:30), 2329089562800)
-  expect_equal(scm(-(1:30)), -2329089562800)
-  expect_error(scm(1:50))
-  expect_error(scm(-(1:50)))
+  expect_equal(scm(-(1:30)), 2329089562800)
+  expect_equal(scm(1:50), 1.85233763824414e+28)
+  expect_equal(scm(-(1:50)), 1.85233763824414e+28)
   expect_equal(scm(as.double(1:50)), 18523376382441352270484866200)
-  expect_equal(scm(-as.double(1:50)), -18523376382441352270484866200)
+  expect_equal(scm(-as.double(1:50)), 18523376382441352270484866200)
 })
 
 test_that("Binary gcd and scm", {
@@ -185,8 +185,8 @@ test_that("Binary gcd and scm", {
   expect_identical(scm2(3L, 0L), 0L)
   expect_identical(scm2(0L, 3L), 0L)
 
-  expect_identical(scm2(seq(0, 25, 0.5), 0.5), scm2(seq(0, 25, 0.5), 0.5))
-  expect_identical(scm2(seq(0L, 25L, 5L), 5L), seq(0L, 25L, 5L), 5L)
+  expect_identical(scm2(seq(0, 25, 0.5), 0.5), seq(0, 25, 0.5))
+  expect_identical(scm2(seq(0L, 25L, 5L), 5L), seq(0L, 25L, 5L))
 
   expect_identical(scm2(3L, 1234567891L), NA_integer_)
   expect_identical(scm2(3, 1234567891), 3703703673)

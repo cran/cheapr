@@ -7,7 +7,7 @@
 
 // Taken from Writing R Extensions
 // void CLEAR_ATTRIB(SEXP x){
-//   SET_ATTRIB(x, R_NilValue);
+//   SET_ATTRIB(x, r_null);
 //   SET_OBJECT(x, 0);
 //   UNSET_S4_OBJECT(x);
 // }
@@ -21,21 +21,8 @@
 
 [[cpp11::register]]
 SEXP cpp_set_rm_attributes(SEXP x){
-  SEXP current = ATTRIB(x);
-  while (current != R_NilValue){
-    Rf_setAttrib(x, TAG(current), R_NilValue);
-    current = CDR(current);
-  }
+  cheapr::attr::clear_attrs(x);
   return x;
-}
-
-// Same as above but no return
-void clear_attributes(SEXP x){
-  SEXP current = ATTRIB(x);
-  while (current != R_NilValue){
-    Rf_setAttrib(x, TAG(current), R_NilValue);
-    current = CDR(current);
-  }
 }
 
 // Add attribute onto existing attributes
@@ -45,16 +32,22 @@ SEXP cpp_set_add_attr(SEXP x, SEXP which, SEXP value) {
   if (Rf_length(which) != 1){
     Rf_error("`which` must be a character vector of length 1 in %s", __func__);
   }
-  SEXP attr_char = SHIELD(Rf_install(utf8_char(STRING_ELT(which, 0))));
-  SEXP value2 = SHIELD(address_equal(x, value) ? Rf_duplicate(value) : value);
-  Rf_setAttrib(x, attr_char, value2);
+  r_symbol_t attr_char = r_cast<r_symbol_t>(get_value<r_string_t>(which, 0));
+  SEXP value2 = SHIELD(address_equal(x, value) ? vec::deep_copy(value) : value);
+  set_attr(x, attr_char, value2);
   YIELD(2);
   return x;
 }
 
 [[cpp11::register]]
 SEXP cpp_set_rm_attr(SEXP x, SEXP which){
-  Rf_setAttrib(x, Rf_installChar(STRING_ELT(which, 0)), R_NilValue);
+  if (Rf_length(which) != 1){
+    Rf_error("`which` must be a length 1 character vector");
+  }
+  if (TYPEOF(which) != STRSXP){
+    Rf_error("`which` must be a length 1 character vector");
+  }
+  set_attr(x, r_cast<r_symbol_t>(get_value<r_string_t>(which, 0)), r_null);
   return x;
 }
 
@@ -63,52 +56,7 @@ SEXP cpp_set_rm_attr(SEXP x, SEXP which){
 [[cpp11::register]]
 SEXP cpp_set_add_attributes(SEXP x, SEXP attributes, bool add) {
 
-  if (!add) clear_attributes(x);
-
-  int32_t NP = 0;
-
-  if (is_null(attributes)){
-    return x;
-  } else if (TYPEOF(attributes) == VECSXP){
-    if (Rf_length(attributes) == 0) return x;
-    SEXP names = SHIELD(get_names(attributes)); ++NP;
-    if (is_null(names)){
-      YIELD(NP);
-      Rf_error("attributes must be a named list");
-    }
-    const SEXP *p_attributes = LIST_PTR_RO(attributes);
-    const SEXP *p_names = STRING_PTR_RO(names);
-
-    SEXP attr_nm = R_NilValue;
-
-    for (int i = 0; i < Rf_length(names); ++i){
-      if (p_names[i] != R_BlankString){
-        attr_nm = Rf_install(utf8_char(p_names[i]));
-        if (address_equal(x, p_attributes[i])){
-          SEXP dup_attr = SHIELD(Rf_duplicate(p_attributes[i])); ++NP;
-          Rf_setAttrib(x, attr_nm, dup_attr);
-        } else {
-          Rf_setAttrib(x, attr_nm, p_attributes[i]);
-        }
-      }
-    }
-    YIELD(NP);
-    return x;
-  } else if (TYPEOF(attributes) == LISTSXP){
-    SEXP current = attributes;
-
-    while (!is_null(current)){
-      if (address_equal(x, CAR(current))){
-        SEXP dup_attr = SHIELD(Rf_duplicate(CAR(current))); ++NP;
-        Rf_setAttrib(x, TAG(current), dup_attr);
-      } else {
-        Rf_setAttrib(x, TAG(current), CAR(current));
-      }
-     current = CDR(current);
-    }
-    YIELD(NP);
-    return x;
-  } else {
-    Rf_error("`attributes` must be a named list");
-  }
+  if (!add) attr::clear_attrs(x);
+  internal::add_attrs(x, attributes);
+  return x;
 }

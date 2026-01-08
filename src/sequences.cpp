@@ -36,28 +36,28 @@ SEXP cpp_int_sequence(SEXP size, SEXP from, SEXP by, bool as_list) {
   }
   R_xlen_t interrupt_counter = 0;
   int start, increment, seq_size;
-  SEXP out = R_NilValue;
+  SEXP out = r_null;
 
 
   if (as_list){
 
-    out = SHIELD(new_vec(VECSXP, size_n)); ++NP;
+    out = SHIELD(new_list(size_n)); ++NP;
     SEXP curr_seq;
 
     PROTECT_INDEX curr_seq_idx;
-    R_ProtectWithIndex(curr_seq = R_NilValue, &curr_seq_idx); ++NP;
+    R_ProtectWithIndex(curr_seq = r_null, &curr_seq_idx); ++NP;
 
     if (size_n > 0){
-      const int *p_size = INTEGER_RO(size);
-      const int *p_from = INTEGER_RO(from);
-      const int *p_by = INTEGER_RO(by);
+      const int *p_size = integer_ptr_ro(size);
+      const int *p_from = integer_ptr_ro(from);
+      const int *p_by = integer_ptr_ro(by);
       for (int i = 0, bi = 0, fi = 0; i < size_n;
         bi = (++bi == by_n) ? 0 : bi,
         fi = (++fi == from_n) ? 0 : fi,
         ++i){
         seq_size = p_size[i];
-        R_Reprotect(curr_seq = new_vec(INTSXP, seq_size), curr_seq_idx);
-        int* RESTRICT p_curr_seq = INTEGER(curr_seq);
+        R_Reprotect(curr_seq = vec::new_vector<int>(seq_size), curr_seq_idx);
+        int* RESTRICT p_curr_seq = integer_ptr(curr_seq);
         start = p_from[fi];
         increment = p_by[bi];
         if (is_r_na(start)){
@@ -82,13 +82,13 @@ SEXP cpp_int_sequence(SEXP size, SEXP from, SEXP by, bool as_list) {
   } else {
 
     R_xlen_t index = 0;
-    out = SHIELD(new_vec(INTSXP, out_size)); ++NP;
-    int* RESTRICT p_out = INTEGER(out);
+    out = SHIELD(vec::new_vector<int>(out_size)); ++NP;
+    int* RESTRICT p_out = integer_ptr(out);
 
     if (size_n > 0){
-      const int *p_size = INTEGER_RO(size);
-      const int *p_from = INTEGER_RO(from);
-      const int *p_by = INTEGER_RO(by);
+      const int *p_size = integer_ptr_ro(size);
+      const int *p_from = integer_ptr_ro(from);
+      const int *p_by = integer_ptr_ro(by);
       for (int i = 0, bi = 0, fi = 0; i < size_n;
         bi = (++bi == by_n) ? 0 : bi,
         fi = (++fi == from_n) ? 0 : fi,
@@ -141,21 +141,21 @@ SEXP cpp_dbl_sequence(SEXP size, SEXP from, SEXP by, bool as_list) {
   int seq_size;
   double start;
   double increment;
-  SEXP out = R_NilValue;
+  SEXP out = r_null;
 
   if (as_list){
 
-    out = SHIELD(new_vec(VECSXP, size_n)); ++NP;
+    out = SHIELD(new_list(size_n)); ++NP;
     SEXP curr_seq;
 
     PROTECT_INDEX curr_seq_idx;
-    R_ProtectWithIndex(curr_seq = R_NilValue, &curr_seq_idx); ++NP;
+    R_ProtectWithIndex(curr_seq = r_null, &curr_seq_idx); ++NP;
 
     if (size_n > 0){
 
-      const int *p_size = INTEGER_RO(size);
-      const double *p_from = REAL_RO(from);
-      const double *p_by = REAL_RO(by);
+      const int *p_size = integer_ptr_ro(size);
+      const double *p_from = real_ptr_ro(from);
+      const double *p_by = real_ptr_ro(by);
 
       for (int i = 0, bi = 0, fi = 0; i < size_n;
         bi = (++bi == by_n) ? 0 : bi,
@@ -163,8 +163,8 @@ SEXP cpp_dbl_sequence(SEXP size, SEXP from, SEXP by, bool as_list) {
         ++i){
 
         seq_size = p_size[i];
-        R_Reprotect(curr_seq = new_vec(REALSXP, seq_size), curr_seq_idx);
-        double* RESTRICT p_curr_seq = REAL(curr_seq);
+        R_Reprotect(curr_seq = new_vector<double>(seq_size), curr_seq_idx);
+        double* RESTRICT p_curr_seq = real_ptr(curr_seq);
         start = p_from[fi];
         increment = p_by[bi];
         if (is_r_na(start)){
@@ -189,13 +189,13 @@ SEXP cpp_dbl_sequence(SEXP size, SEXP from, SEXP by, bool as_list) {
 
     R_xlen_t index = 0;
 
-    out = SHIELD(new_vec(REALSXP, out_size)); ++NP;
-    double* RESTRICT p_out = REAL(out);
+    out = SHIELD(new_vector<double>(out_size)); ++NP;
+    double* RESTRICT p_out = real_ptr(out);
     if (size_n > 0){
 
-      const int *p_size = INTEGER_RO(size);
-      const double *p_from = REAL_RO(from);
-      const double *p_by = REAL_RO(by);
+      const int *p_size = integer_ptr_ro(size);
+      const double *p_from = real_ptr_ro(from);
+      const double *p_by = real_ptr_ro(by);
       for (int i = 0, bi = 0, fi = 0; i < size_n;
         bi = (++bi == by_n) ? 0 : bi,
         fi = (++fi == from_n) ? 0 : fi,
@@ -248,19 +248,19 @@ SEXP cpp_sequence(SEXP size, SEXP from, SEXP by, bool as_list, bool add_id) {
     SHIELD(size = cpp_rep_len(size, n)); ++NP;
   }
 
-  SEXP out = R_NilValue;
+  SEXP out = r_null;
 
   switch (TYPEOF(from)){
   case INTSXP: {
     switch (TYPEOF(by)){
   case INTSXP: {
     int_fast64_t start, increment, seq_size, seq_end;
-    int_fast64_t int_max = INTEGER_MAX;
+    int_fast64_t int_max = r_limits::r_int_max;
     int_fast64_t zero = 0;
     bool out_is_integer = true;
-    const int *p_size = INTEGER_RO(size);
-    const int *p_from = INTEGER_RO(from);
-    const int *p_by = INTEGER_RO(by);
+    const int *p_size = integer_ptr_ro(size);
+    const int *p_from = integer_ptr_ro(from);
+    const int *p_by = integer_ptr_ro(by);
 
     for (int i = 0, bi = 0, fi = 0; i < n;
       bi = (++bi == by_n) ? 0 : bi,
@@ -279,14 +279,14 @@ SEXP cpp_sequence(SEXP size, SEXP from, SEXP by, bool as_list, bool add_id) {
     if (out_is_integer){
       SHIELD(out = cpp_int_sequence(size, from, by, as_list)); ++NP;
     } else {
-      SHIELD(from = coerce_vec(from, REALSXP)); ++NP;
-      SHIELD(by = coerce_vec(by, REALSXP)); ++NP;
+      SHIELD(from = vec::coerce_vec(from, REALSXP)); ++NP;
+      SHIELD(by = vec::coerce_vec(by, REALSXP)); ++NP;
       SHIELD(out = cpp_dbl_sequence(size, from, by, as_list)); ++NP;
     }
     break;
   }
   case REALSXP: {
-    SHIELD(from = coerce_vec(from, REALSXP)); ++NP;
+    SHIELD(from = vec::coerce_vec(from, REALSXP)); ++NP;
     SHIELD(out = cpp_dbl_sequence(size, from, by, as_list)); ++NP;
     break;
   }
@@ -300,7 +300,7 @@ SEXP cpp_sequence(SEXP size, SEXP from, SEXP by, bool as_list, bool add_id) {
   case REALSXP: {
     switch (TYPEOF(by)){
   case INTSXP: {
-    SHIELD(by = coerce_vec(by, REALSXP)); ++NP;
+    SHIELD(by = vec::coerce_vec(by, REALSXP)); ++NP;
     SHIELD(out = cpp_dbl_sequence(size, from, by, as_list)); ++NP;
     break;
   }
@@ -327,7 +327,7 @@ SEXP cpp_sequence(SEXP size, SEXP from, SEXP by, bool as_list, bool add_id) {
     } else {
       SHIELD(out_names = cpp_sequence_id(size)); ++NP;
     }
-    set_names(out, out_names);
+    set_old_names(out, out_names);
   }
   YIELD(NP);
   return out;
@@ -339,7 +339,7 @@ SEXP cpp_window_sequence(SEXP size,
                          bool partial = true,
                          bool ascending = true) {
   int size_n = Rf_length(size);
-  SEXP size_sexp = SHIELD(coerce_vec(size, INTSXP));
+  SEXP size_sexp = SHIELD(vec::coerce_vec(size, INTSXP));
   R_xlen_t min_size = cpp_min(size_sexp);
   if (min_size < 0){
     YIELD(1);
@@ -347,9 +347,9 @@ SEXP cpp_window_sequence(SEXP size,
   }
   k = std::fmax(k, 0);
   R_xlen_t N = cpp_sum(size_sexp);
-  SEXP out = SHIELD(new_vec(INTSXP, N));
-  int *p_out = INTEGER(out);
-  int *p_size = INTEGER(size_sexp);
+  SEXP out = SHIELD(vec::new_vector<int>(N));
+  int *p_out = integer_ptr(out);
+  int *p_size = integer_ptr(size_sexp);
   R_xlen_t index = 0;
   if (ascending){
     // right aligned window sequences
@@ -368,7 +368,7 @@ SEXP cpp_window_sequence(SEXP size,
       for (int j = 0; j < size_n; ++j){
         for (int i = 0; i < p_size[j]; ++i){
           if (i < (k - 1)){
-            p_out[index] = NA_INTEGER;
+            p_out[index] = na::integer;
           } else {
             p_out[index] = k;
           }
@@ -396,7 +396,7 @@ SEXP cpp_window_sequence(SEXP size,
         for (int i = 0; i < p_size[j]; ++i){
           idiff = p_size[j] - i - 1;
           if (idiff < (k - 1)){
-            p_out[index] = NA_INTEGER;
+            p_out[index] = na::integer;
           } else {
             p_out[index] = k;
           }
@@ -411,7 +411,7 @@ SEXP cpp_window_sequence(SEXP size,
 
 [[cpp11::register]]
 SEXP cpp_lag_sequence(SEXP size, double k, bool partial = false) {
-  SHIELD(size = coerce_vec(size, INTSXP));
+  SHIELD(size = vec::coerce_vec(size, INTSXP));
   R_xlen_t min_size = cpp_min(size);
   if (min_size < 0){
     YIELD(1);
@@ -419,9 +419,9 @@ SEXP cpp_lag_sequence(SEXP size, double k, bool partial = false) {
   }
   int size_n = Rf_length(size);
   k = std::fmax(k, 0);
-  SEXP out = SHIELD(new_vec(INTSXP, cpp_sum(size)));
-  int *p_out = INTEGER(out);
-  int *p_size = INTEGER(size);
+  SEXP out = SHIELD(vec::new_vector<int>(cpp_sum(size)));
+  int *p_out = integer_ptr(out);
+  int *p_size = integer_ptr(size);
   R_xlen_t index = 0;
   if (partial){
     for (int j = 0; j < size_n; ++j){
@@ -438,7 +438,7 @@ SEXP cpp_lag_sequence(SEXP size, double k, bool partial = false) {
     for (int j = 0; j < size_n; ++j){
       for (int i = 0; i < p_size[j]; ++i){
         if (i < k){
-          p_out[index] = NA_INTEGER;
+          p_out[index] = na::integer;
         } else {
           p_out[index] = k;
         }
@@ -451,7 +451,7 @@ SEXP cpp_lag_sequence(SEXP size, double k, bool partial = false) {
 }
 [[cpp11::register]]
 SEXP cpp_lead_sequence(SEXP size, double k, bool partial = false) {
-  SHIELD(size = coerce_vec(size, INTSXP));
+  SHIELD(size = vec::coerce_vec(size, INTSXP));
   R_xlen_t min_size = cpp_min(size);
   if (min_size < 0){
     YIELD(1);
@@ -459,9 +459,9 @@ SEXP cpp_lead_sequence(SEXP size, double k, bool partial = false) {
   }
   int size_n = Rf_length(size);
   k = std::fmax(k, 0);
-  SEXP out = SHIELD(new_vec(INTSXP, cpp_sum(size)));
-  int *p_out = INTEGER(out);
-  int *p_size = INTEGER(size);
+  SEXP out = SHIELD(vec::new_vector<int>(cpp_sum(size)));
+  int *p_out = integer_ptr(out);
+  int *p_size = integer_ptr(size);
   R_xlen_t index = 0;
   int idiff;
   if (partial){
@@ -481,7 +481,7 @@ SEXP cpp_lead_sequence(SEXP size, double k, bool partial = false) {
       for (int i = 0; i < p_size[j]; ++i){
         idiff = p_size[j] - i - 1;
         if (idiff < k){
-          p_out[index] = NA_INTEGER;
+          p_out[index] = na::integer;
         } else {
           p_out[index] = k;
         }
@@ -494,17 +494,18 @@ SEXP cpp_lead_sequence(SEXP size, double k, bool partial = false) {
 }
 
 SEXP cpp_seq_len(R_xlen_t n){
-  if (n > INTEGER_MAX){
-    SEXP out = SHIELD(new_vec(REALSXP, n));
-    double* RESTRICT p_out = REAL(out);
-    OMP_FOR_SIMD
+  if (n > r_limits::r_int_max){
+    SEXP out = SHIELD(new_vector<double>(n));
+    double* RESTRICT p_out = real_ptr(out);
+    OMP_SIMD
     for (R_xlen_t i = 0; i < n; ++i) p_out[i] = 1.0 + static_cast<double>(i);
+    // for (R_xlen_t i = 1; i < (n + 1); ++i) p_out[i - 1] = static_cast<double>(i);
     YIELD(1);
     return out;
   } else {
-    SEXP out = SHIELD(new_vec(INTSXP, n));
-    int* RESTRICT p_out = INTEGER(out);
-    OMP_FOR_SIMD
+    SEXP out = SHIELD(vec::new_vector<int>(n));
+    int* RESTRICT p_out = integer_ptr(out);
+    OMP_SIMD
     for (int i = 0; i < n; ++i) p_out[i] = i + 1;
     YIELD(1);
     return out;
@@ -526,7 +527,7 @@ double pretty_ceiling(double x){
 }
 
 bool can_be_int(double x, double tolerance){
-  return is_whole_number(x, tolerance) && is_integerable(x);
+  return static_cast<bool>(is_whole_number(x, tolerance)) && can_be_int(x);
 }
 
 double seq_end(double size, double from, double by){
@@ -536,10 +537,6 @@ double seq_width(double size, double from, double to){
   double del = (to - from);
   double out = del / std::fmax(size - 1.0, 0.0);
   return del == 0.0 ? 0.0 : out;
-}
-
-bool is_infinite(double x){
-  return (x == R_NegInf) || (x == R_PosInf);
 }
 
 [[cpp11::register]]
@@ -552,12 +549,12 @@ SEXP cpp_fixed_width_breaks(double start, double end, double n,
   if (n < 1){
     Rf_error("n must be >= 1");
   }
-  if (n >= R_PosInf){
+  if (n >= r_limits::r_pos_inf){
     Rf_error("n must be finite");
   }
   if (is_r_na(start) || is_r_na(end) ||
-      is_infinite(start) || is_infinite(end)){
-    return Rf_ScalarReal(NA_REAL);
+      is_r_inf(start) || is_r_inf(end)){
+    return as_vector(na::real);
   }
   // Switch them if needed
   if (start > end){
@@ -593,9 +590,9 @@ SEXP cpp_fixed_width_breaks(double start, double end, double n,
     }
     adj_start = start - (rng_width / 1000.0);
     adj_end = end + (rng_width / 1000.0);
-    SEXP size = SHIELD(Rf_ScalarInteger(n + 1.0)); ++NP;
-    SEXP from = SHIELD(Rf_ScalarReal(adj_start)); ++NP;
-    SEXP by = SHIELD(Rf_ScalarReal(seq_width(n + 1.0, adj_start, adj_end))); ++NP;
+    SEXP size = SHIELD(as_vector(r_cast<int>(n + 1.0))); ++NP;
+    SEXP from = SHIELD(as_vector(r_cast<double>(adj_start))); ++NP;
+    SEXP by = SHIELD(as_vector(r_cast<double>(seq_width(n + 1.0, adj_start, adj_end)))); ++NP;
     SEXP out = SHIELD(cpp_dbl_sequence(size, from, by, false)); ++NP;
     YIELD(NP);
     return out;
@@ -611,9 +608,9 @@ SEXP cpp_fixed_width_breaks(double start, double end, double n,
     if (expand_max){
       ++out_size;
     }
-    SEXP size_sexp = SHIELD(Rf_ScalarInteger(out_size)); ++NP;
-    SEXP start_sexp = SHIELD(Rf_ScalarReal(start)); ++NP;
-    SEXP width_sexp = SHIELD(Rf_ScalarReal(bin_width)); ++NP;
+    SEXP size_sexp = SHIELD(as_vector(r_cast<int>(out_size))); ++NP;
+    SEXP start_sexp = SHIELD(as_vector(r_cast<double>(start))); ++NP;
+    SEXP width_sexp = SHIELD(as_vector(r_cast<double>(bin_width))); ++NP;
     SEXP out = SHIELD(cpp_dbl_sequence(size_sexp, start_sexp, width_sexp, false)); ++NP;
     YIELD(NP);
     return out;
@@ -663,13 +660,13 @@ SEXP cpp_fixed_width_breaks(double start, double end, double n,
 
       scale = std::fabs(log10_scale(adj_width));
       scale_adj = std::pow(10.0, scale);
-      adj_width = round_nearest_even(adj_width * scale_adj);
+      adj_width = r_round(adj_width * scale_adj);
 
       // Not sure if adj_start needs rounding here
       adj_start *= scale_adj;
 
-      if (is_whole_number(adj_start, tol)){
-        adj_start = round_nearest_even(adj_start);
+      if (static_cast<bool>(is_whole_number(adj_start, tol))){
+        adj_start = r_round(adj_start);
       }
       start *= scale_adj;
       end *= scale_adj;
@@ -730,30 +727,30 @@ SEXP cpp_fixed_width_breaks(double start, double end, double n,
     // hence result is not an integer
 
     SEXP out, seq_size, seq_from, seq_width;
-    out = R_NilValue, seq_size = R_NilValue;
-    seq_from = R_NilValue, seq_width = R_NilValue;
+    out = r_null, seq_size = r_null;
+    seq_from = r_null, seq_width = r_null;
 
     if (!scale_up && can_be_int(adj_width, tol) && can_be_int(adj_start, tol) &&
-       is_integerable(adj_end)){
-      adj_width = round_nearest_even(adj_width);
-      adj_start = round_nearest_even(adj_start);
+       can_be_int(adj_end)){
+      adj_width = r_round(adj_width);
+      adj_start = r_round(adj_start);
 
-      seq_size = SHIELD(Rf_ScalarInteger(n_breaks)); ++NP;
-      seq_from = SHIELD(Rf_ScalarInteger(adj_start)); ++NP;
-      seq_width = SHIELD(Rf_ScalarInteger(adj_width)); ++NP;
+      seq_size = SHIELD(as_vector(r_cast<int>(n_breaks))); ++NP;
+      seq_from = SHIELD(as_vector(r_cast<int>(adj_start))); ++NP;
+      seq_width = SHIELD(as_vector(r_cast<int>(adj_width))); ++NP;
 
       out = SHIELD(cpp_int_sequence(seq_size, seq_from, seq_width, false)); ++NP;
     }
 
     if (scale_up){
-      seq_size = SHIELD(as_r_scalar<int>(n_breaks)); ++NP;
-      seq_from = SHIELD(as_r_scalar<double>(adj_start)); ++NP;
-      seq_width = SHIELD(as_r_scalar<double>(adj_width)); ++NP;
+      seq_size = SHIELD(as_vector(r_cast<int>(n_breaks))); ++NP;
+      seq_from = SHIELD(as_vector(r_cast<double>(adj_start))); ++NP;
+      seq_width = SHIELD(as_vector(r_cast<double>(adj_width))); ++NP;
 
       out = SHIELD(cpp_dbl_sequence(seq_size, seq_from, seq_width, false)); ++NP;
       int seq_n = n_breaks;
-      double* RESTRICT p_out = REAL(out);
-      OMP_FOR_SIMD
+      double* RESTRICT p_out = real_ptr(out);
+      OMP_SIMD
       for (int i = 0; i < seq_n; ++i) p_out[i] /= scale_adj;
     }
 

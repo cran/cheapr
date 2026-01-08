@@ -5,6 +5,13 @@
 #include "cpp11/declarations.hpp"
 #include <R_ext/Visibility.h>
 
+// altrep.cpp
+SEXP foo3(SEXP x);
+extern "C" SEXP _cheapr_foo3(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(foo3(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
 // attrs.cpp
 SEXP cpp_set_rm_attributes(SEXP x);
 extern "C" SEXP _cheapr_cpp_set_rm_attributes(SEXP x) {
@@ -62,10 +69,10 @@ extern "C" SEXP _cheapr_cpp_type(SEXP x) {
   END_CPP11
 }
 // combine.cpp
-SEXP cpp_rep_len(SEXP x, int length);
+SEXP cpp_rep_len(SEXP x, R_xlen_t length);
 extern "C" SEXP _cheapr_cpp_rep_len(SEXP x, SEXP length) {
   BEGIN_CPP11
-    return cpp11::as_sexp(cpp_rep_len(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<int>>(length)));
+    return cpp11::as_sexp(cpp_rep_len(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<R_xlen_t>>(length)));
   END_CPP11
 }
 // combine.cpp
@@ -139,13 +146,6 @@ extern "C" SEXP _cheapr_cpp_if_else(SEXP condition, SEXP yes, SEXP no, SEXP na) 
   END_CPP11
 }
 // gcd.cpp
-double lcm2(double x, double y, double tol, bool na_rm);
-extern "C" SEXP _cheapr_lcm2(SEXP x, SEXP y, SEXP tol, SEXP na_rm) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(lcm2(cpp11::as_cpp<cpp11::decay_t<double>>(x), cpp11::as_cpp<cpp11::decay_t<double>>(y), cpp11::as_cpp<cpp11::decay_t<double>>(tol), cpp11::as_cpp<cpp11::decay_t<bool>>(na_rm)));
-  END_CPP11
-}
-// gcd.cpp
 SEXP cpp_gcd(SEXP x, double tol, bool na_rm, bool break_early, bool round);
 extern "C" SEXP _cheapr_cpp_gcd(SEXP x, SEXP tol, SEXP na_rm, SEXP break_early, SEXP round) {
   BEGIN_CPP11
@@ -178,13 +178,6 @@ SEXP cpp_group_starts(SEXP group_id, int n_groups);
 extern "C" SEXP _cheapr_cpp_group_starts(SEXP group_id, SEXP n_groups) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_group_starts(cpp11::as_cpp<cpp11::decay_t<SEXP>>(group_id), cpp11::as_cpp<cpp11::decay_t<int>>(n_groups)));
-  END_CPP11
-}
-// groups.cpp
-SEXP cpp_group_counts(SEXP group_id, int n_groups);
-extern "C" SEXP _cheapr_cpp_group_counts(SEXP group_id, SEXP n_groups) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_group_counts(cpp11::as_cpp<cpp11::decay_t<SEXP>>(group_id), cpp11::as_cpp<cpp11::decay_t<int>>(n_groups)));
   END_CPP11
 }
 // int64.cpp
@@ -272,10 +265,10 @@ extern "C" SEXP _cheapr_cpp_new_list(SEXP size, SEXP default_value) {
   END_CPP11
 }
 // lists.cpp
-SEXP cpp_drop_null(SEXP l, bool always_shallow_copy);
-extern "C" SEXP _cheapr_cpp_drop_null(SEXP l, SEXP always_shallow_copy) {
+SEXP cpp_drop_null(SEXP x);
+extern "C" SEXP _cheapr_cpp_drop_null(SEXP x) {
   BEGIN_CPP11
-    return cpp11::as_sexp(cpp_drop_null(cpp11::as_cpp<cpp11::decay_t<SEXP>>(l), cpp11::as_cpp<cpp11::decay_t<bool>>(always_shallow_copy)));
+    return cpp11::as_sexp(cpp_drop_null(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
   END_CPP11
 }
 // lists.cpp
@@ -311,6 +304,216 @@ SEXP cpp_as_df(SEXP x);
 extern "C" SEXP _cheapr_cpp_as_df(SEXP x) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_as_df(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_abs(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_abs(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_abs(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_abs(SEXP x);
+extern "C" SEXP _cheapr_cpp_abs(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_abs(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_floor(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_floor(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_floor(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_floor(SEXP x);
+extern "C" SEXP _cheapr_cpp_floor(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_floor(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_ceiling(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_ceiling(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_ceiling(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_ceiling(SEXP x);
+extern "C" SEXP _cheapr_cpp_ceiling(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_ceiling(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_trunc(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_trunc(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_trunc(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_trunc(SEXP x);
+extern "C" SEXP _cheapr_cpp_trunc(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_trunc(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_change_sign(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_change_sign(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_change_sign(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_negate(SEXP x);
+extern "C" SEXP _cheapr_cpp_negate(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_negate(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_exp(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_exp(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_exp(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_exp(SEXP x);
+extern "C" SEXP _cheapr_cpp_exp(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_exp(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_sqrt(SEXP x);
+extern "C" SEXP _cheapr_cpp_set_sqrt(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_sqrt(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_sqrt(SEXP x);
+extern "C" SEXP _cheapr_cpp_sqrt(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_sqrt(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_log(SEXP x, SEXP base);
+extern "C" SEXP _cheapr_cpp_log(SEXP x, SEXP base) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_log(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(base)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_round(SEXP x, SEXP digits);
+extern "C" SEXP _cheapr_cpp_round(SEXP x, SEXP digits) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_round(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(digits)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_signif(SEXP x, SEXP digits);
+extern "C" SEXP _cheapr_cpp_signif(SEXP x, SEXP digits) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_signif(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(digits)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_add(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_add(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_add(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_subtract(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_subtract(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_subtract(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_multiply(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_multiply(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_multiply(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_divide(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_divide(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_divide(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_pow(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_pow(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_pow(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_add(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_set_add(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_add(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_subtract(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_set_subtract(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_subtract(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_multiply(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_set_multiply(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_multiply(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_divide(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_set_divide(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_divide(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_pow(SEXP x, SEXP y);
+extern "C" SEXP _cheapr_cpp_set_pow(SEXP x, SEXP y) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_pow(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_log(SEXP x, SEXP base);
+extern "C" SEXP _cheapr_cpp_set_log(SEXP x, SEXP base) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_log(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(base)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_set_round(SEXP x, SEXP digits);
+extern "C" SEXP _cheapr_cpp_set_round(SEXP x, SEXP digits) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_set_round(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(digits)));
+  END_CPP11
+}
+// math.cpp
+SEXP cpp_int_sign(SEXP x);
+extern "C" SEXP _cheapr_cpp_int_sign(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_int_sign(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
   END_CPP11
 }
 // nas.cpp
@@ -419,10 +622,10 @@ extern "C" SEXP _cheapr_cpp_val_replace(SEXP x, SEXP value, SEXP replace, SEXP r
   END_CPP11
 }
 // scalars.cpp
-SEXP cpp_val_remove(SEXP x, SEXP value);
-extern "C" SEXP _cheapr_cpp_val_remove(SEXP x, SEXP value) {
+SEXP cpp_val_remove(SEXP x, SEXP value, bool recursive);
+extern "C" SEXP _cheapr_cpp_val_remove(SEXP x, SEXP value, SEXP recursive) {
   BEGIN_CPP11
-    return cpp11::as_sexp(cpp_val_remove(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(value)));
+    return cpp11::as_sexp(cpp_val_remove(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(value), cpp11::as_cpp<cpp11::decay_t<bool>>(recursive)));
   END_CPP11
 }
 // sequences.cpp
@@ -465,111 +668,6 @@ SEXP cpp_fixed_width_breaks(double start, double end, double n, bool pretty, boo
 extern "C" SEXP _cheapr_cpp_fixed_width_breaks(SEXP start, SEXP end, SEXP n, SEXP pretty, SEXP expand_min, SEXP expand_max) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_fixed_width_breaks(cpp11::as_cpp<cpp11::decay_t<double>>(start), cpp11::as_cpp<cpp11::decay_t<double>>(end), cpp11::as_cpp<cpp11::decay_t<double>>(n), cpp11::as_cpp<cpp11::decay_t<bool>>(pretty), cpp11::as_cpp<cpp11::decay_t<bool>>(expand_min), cpp11::as_cpp<cpp11::decay_t<bool>>(expand_max)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_abs(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_abs(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_abs(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_floor(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_floor(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_floor(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_ceiling(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_ceiling(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_ceiling(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_trunc(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_trunc(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_trunc(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_change_sign(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_change_sign(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_change_sign(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_exp(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_exp(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_exp(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_sqrt(SEXP x);
-extern "C" SEXP _cheapr_cpp_set_sqrt(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_sqrt(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_add(SEXP x, SEXP y);
-extern "C" SEXP _cheapr_cpp_set_add(SEXP x, SEXP y) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_add(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_subtract(SEXP x, SEXP y);
-extern "C" SEXP _cheapr_cpp_set_subtract(SEXP x, SEXP y) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_subtract(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_multiply(SEXP x, SEXP y);
-extern "C" SEXP _cheapr_cpp_set_multiply(SEXP x, SEXP y) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_multiply(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_divide(SEXP x, SEXP y);
-extern "C" SEXP _cheapr_cpp_set_divide(SEXP x, SEXP y) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_divide(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_pow(SEXP x, SEXP y);
-extern "C" SEXP _cheapr_cpp_set_pow(SEXP x, SEXP y) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_pow(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(y)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_log(SEXP x, SEXP base);
-extern "C" SEXP _cheapr_cpp_set_log(SEXP x, SEXP base) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_log(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(base)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_set_round(SEXP x, SEXP digits);
-extern "C" SEXP _cheapr_cpp_set_round(SEXP x, SEXP digits) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_set_round(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(digits)));
-  END_CPP11
-}
-// set_math.cpp
-SEXP cpp_int_sign(SEXP x);
-extern "C" SEXP _cheapr_cpp_int_sign(SEXP x) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(cpp_int_sign(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x)));
   END_CPP11
 }
 // sset.cpp
@@ -626,6 +724,13 @@ SEXP cpp_paste(SEXP x, SEXP sep, SEXP collapse);
 extern "C" SEXP _cheapr_cpp_paste(SEXP x, SEXP sep, SEXP collapse) {
   BEGIN_CPP11
     return cpp11::as_sexp(cpp_paste(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<SEXP>>(sep), cpp11::as_cpp<cpp11::decay_t<SEXP>>(collapse)));
+  END_CPP11
+}
+// utils.cpp
+int cpp_max_threads();
+extern "C" SEXP _cheapr_cpp_max_threads() {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_max_threads());
   END_CPP11
 }
 // utils.cpp
@@ -748,6 +853,13 @@ extern "C" SEXP _cheapr_cpp_is_whole_number(SEXP x, SEXP tol_, SEXP na_rm_) {
     return cpp11::as_sexp(cpp_is_whole_number(cpp11::as_cpp<cpp11::decay_t<SEXP>>(x), cpp11::as_cpp<cpp11::decay_t<double>>(tol_), cpp11::as_cpp<cpp11::decay_t<bool>>(na_rm_)));
   END_CPP11
 }
+// utils.cpp
+SEXP cheapr_do_memory_leak_test();
+extern "C" SEXP _cheapr_cheapr_do_memory_leak_test() {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cheapr_do_memory_leak_test());
+  END_CPP11
+}
 // which.cpp
 SEXP cpp_which_(SEXP x, bool invert);
 extern "C" SEXP _cheapr_cpp_which_(SEXP x, SEXP invert) {
@@ -786,6 +898,9 @@ extern "C" SEXP _cheapr_cpp_lgl_locs(SEXP x, SEXP n_true, SEXP n_false, SEXP inc
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
+    {"_cheapr_cheapr_do_memory_leak_test",  (DL_FUNC) &_cheapr_cheapr_do_memory_leak_test,  0},
+    {"_cheapr_cpp_abs",                     (DL_FUNC) &_cheapr_cpp_abs,                     1},
+    {"_cheapr_cpp_add",                     (DL_FUNC) &_cheapr_cpp_add,                     2},
     {"_cheapr_cpp_address",                 (DL_FUNC) &_cheapr_cpp_address,                 1},
     {"_cheapr_cpp_all_na",                  (DL_FUNC) &_cheapr_cpp_all_na,                  3},
     {"_cheapr_cpp_any_na",                  (DL_FUNC) &_cheapr_cpp_any_na,                  2},
@@ -794,6 +909,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_c",                       (DL_FUNC) &_cheapr_cpp_c,                       1},
     {"_cheapr_cpp_cast",                    (DL_FUNC) &_cheapr_cpp_cast,                    2},
     {"_cheapr_cpp_cast_common",             (DL_FUNC) &_cheapr_cpp_cast_common,             1},
+    {"_cheapr_cpp_ceiling",                 (DL_FUNC) &_cheapr_cpp_ceiling,                 1},
     {"_cheapr_cpp_col_all_na",              (DL_FUNC) &_cheapr_cpp_col_all_na,              2},
     {"_cheapr_cpp_col_any_na",              (DL_FUNC) &_cheapr_cpp_col_any_na,              2},
     {"_cheapr_cpp_col_na_counts",           (DL_FUNC) &_cheapr_cpp_col_na_counts,           2},
@@ -806,12 +922,14 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_df_select",               (DL_FUNC) &_cheapr_cpp_df_select,               2},
     {"_cheapr_cpp_df_slice",                (DL_FUNC) &_cheapr_cpp_df_slice,                3},
     {"_cheapr_cpp_df_subset",               (DL_FUNC) &_cheapr_cpp_df_subset,               4},
-    {"_cheapr_cpp_drop_null",               (DL_FUNC) &_cheapr_cpp_drop_null,               2},
+    {"_cheapr_cpp_divide",                  (DL_FUNC) &_cheapr_cpp_divide,                  2},
+    {"_cheapr_cpp_drop_null",               (DL_FUNC) &_cheapr_cpp_drop_null,               1},
+    {"_cheapr_cpp_exp",                     (DL_FUNC) &_cheapr_cpp_exp,                     1},
     {"_cheapr_cpp_fixed_width_breaks",      (DL_FUNC) &_cheapr_cpp_fixed_width_breaks,      6},
+    {"_cheapr_cpp_floor",                   (DL_FUNC) &_cheapr_cpp_floor,                   1},
     {"_cheapr_cpp_format_numeric_as_int64", (DL_FUNC) &_cheapr_cpp_format_numeric_as_int64, 1},
     {"_cheapr_cpp_gcd",                     (DL_FUNC) &_cheapr_cpp_gcd,                     5},
     {"_cheapr_cpp_gcd2_vectorised",         (DL_FUNC) &_cheapr_cpp_gcd2_vectorised,         4},
-    {"_cheapr_cpp_group_counts",            (DL_FUNC) &_cheapr_cpp_group_counts,            2},
     {"_cheapr_cpp_group_starts",            (DL_FUNC) &_cheapr_cpp_group_starts,            2},
     {"_cheapr_cpp_growth_rate",             (DL_FUNC) &_cheapr_cpp_growth_rate,             1},
     {"_cheapr_cpp_if_else",                 (DL_FUNC) &_cheapr_cpp_if_else,                 4},
@@ -837,15 +955,20 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_list_as_df",              (DL_FUNC) &_cheapr_cpp_list_as_df,              1},
     {"_cheapr_cpp_list_assign",             (DL_FUNC) &_cheapr_cpp_list_assign,             2},
     {"_cheapr_cpp_list_c",                  (DL_FUNC) &_cheapr_cpp_list_c,                  1},
+    {"_cheapr_cpp_log",                     (DL_FUNC) &_cheapr_cpp_log,                     2},
     {"_cheapr_cpp_matrix_col_na_counts",    (DL_FUNC) &_cheapr_cpp_matrix_col_na_counts,    1},
     {"_cheapr_cpp_matrix_row_na_counts",    (DL_FUNC) &_cheapr_cpp_matrix_row_na_counts,    1},
+    {"_cheapr_cpp_max_threads",             (DL_FUNC) &_cheapr_cpp_max_threads,             0},
+    {"_cheapr_cpp_multiply",                (DL_FUNC) &_cheapr_cpp_multiply,                2},
     {"_cheapr_cpp_na_init",                 (DL_FUNC) &_cheapr_cpp_na_init,                 2},
     {"_cheapr_cpp_name_repair",             (DL_FUNC) &_cheapr_cpp_name_repair,             3},
+    {"_cheapr_cpp_negate",                  (DL_FUNC) &_cheapr_cpp_negate,                  1},
     {"_cheapr_cpp_new_df",                  (DL_FUNC) &_cheapr_cpp_new_df,                  4},
     {"_cheapr_cpp_new_list",                (DL_FUNC) &_cheapr_cpp_new_list,                2},
     {"_cheapr_cpp_num_na",                  (DL_FUNC) &_cheapr_cpp_num_na,                  2},
     {"_cheapr_cpp_numeric_to_int64",        (DL_FUNC) &_cheapr_cpp_numeric_to_int64,        1},
     {"_cheapr_cpp_paste",                   (DL_FUNC) &_cheapr_cpp_paste,                   3},
+    {"_cheapr_cpp_pow",                     (DL_FUNC) &_cheapr_cpp_pow,                     2},
     {"_cheapr_cpp_rebuild",                 (DL_FUNC) &_cheapr_cpp_rebuild,                 5},
     {"_cheapr_cpp_recycle",                 (DL_FUNC) &_cheapr_cpp_recycle,                 2},
     {"_cheapr_cpp_rep",                     (DL_FUNC) &_cheapr_cpp_rep,                     2},
@@ -853,6 +976,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_rep_len",                 (DL_FUNC) &_cheapr_cpp_rep_len,                 2},
     {"_cheapr_cpp_replace",                 (DL_FUNC) &_cheapr_cpp_replace,                 5},
     {"_cheapr_cpp_rev",                     (DL_FUNC) &_cheapr_cpp_rev,                     2},
+    {"_cheapr_cpp_round",                   (DL_FUNC) &_cheapr_cpp_round,                   2},
     {"_cheapr_cpp_row_na_counts",           (DL_FUNC) &_cheapr_cpp_row_na_counts,           2},
     {"_cheapr_cpp_semi_copy",               (DL_FUNC) &_cheapr_cpp_semi_copy,               1},
     {"_cheapr_cpp_sequence",                (DL_FUNC) &_cheapr_cpp_sequence,                5},
@@ -879,14 +1003,18 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_set_trunc",               (DL_FUNC) &_cheapr_cpp_set_trunc,               1},
     {"_cheapr_cpp_setdiff",                 (DL_FUNC) &_cheapr_cpp_setdiff,                 3},
     {"_cheapr_cpp_shallow_copy",            (DL_FUNC) &_cheapr_cpp_shallow_copy,            1},
+    {"_cheapr_cpp_signif",                  (DL_FUNC) &_cheapr_cpp_signif,                  2},
+    {"_cheapr_cpp_sqrt",                    (DL_FUNC) &_cheapr_cpp_sqrt,                    1},
     {"_cheapr_cpp_sset",                    (DL_FUNC) &_cheapr_cpp_sset,                    3},
     {"_cheapr_cpp_sset2",                   (DL_FUNC) &_cheapr_cpp_sset2,                   5},
     {"_cheapr_cpp_sset_int64",              (DL_FUNC) &_cheapr_cpp_sset_int64,              2},
     {"_cheapr_cpp_str_coalesce",            (DL_FUNC) &_cheapr_cpp_str_coalesce,            1},
+    {"_cheapr_cpp_subtract",                (DL_FUNC) &_cheapr_cpp_subtract,                2},
     {"_cheapr_cpp_tabulate",                (DL_FUNC) &_cheapr_cpp_tabulate,                2},
+    {"_cheapr_cpp_trunc",                   (DL_FUNC) &_cheapr_cpp_trunc,                   1},
     {"_cheapr_cpp_type",                    (DL_FUNC) &_cheapr_cpp_type,                    1},
     {"_cheapr_cpp_unnested_length",         (DL_FUNC) &_cheapr_cpp_unnested_length,         1},
-    {"_cheapr_cpp_val_remove",              (DL_FUNC) &_cheapr_cpp_val_remove,              2},
+    {"_cheapr_cpp_val_remove",              (DL_FUNC) &_cheapr_cpp_val_remove,              3},
     {"_cheapr_cpp_val_replace",             (DL_FUNC) &_cheapr_cpp_val_replace,             4},
     {"_cheapr_cpp_vector_length",           (DL_FUNC) &_cheapr_cpp_vector_length,           1},
     {"_cheapr_cpp_which_",                  (DL_FUNC) &_cheapr_cpp_which_,                  2},
@@ -894,7 +1022,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cheapr_cpp_which_not_na",            (DL_FUNC) &_cheapr_cpp_which_not_na,            1},
     {"_cheapr_cpp_which_val",               (DL_FUNC) &_cheapr_cpp_which_val,               3},
     {"_cheapr_cpp_window_sequence",         (DL_FUNC) &_cheapr_cpp_window_sequence,         4},
-    {"_cheapr_lcm2",                        (DL_FUNC) &_cheapr_lcm2,                        4},
+    {"_cheapr_foo3",                        (DL_FUNC) &_cheapr_foo3,                        1},
     {"_cheapr_r_copy",                      (DL_FUNC) &_cheapr_r_copy,                      1},
     {"_cheapr_var_sum_squared_diff",        (DL_FUNC) &_cheapr_var_sum_squared_diff,        2},
     {NULL, NULL, 0}

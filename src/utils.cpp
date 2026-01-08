@@ -5,6 +5,11 @@
 // Author: Nick Christofides
 
 [[cpp11::register]]
+int cpp_max_threads(){
+  return OMP_MAX_THREADS;
+}
+
+[[cpp11::register]]
 bool cpp_is_simple_atomic_vec(SEXP x){
   return cheapr_is_simple_atomic_vec(x);
 }
@@ -16,12 +21,12 @@ bool cpp_is_simple_vec(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_vector_length(SEXP x){
-  return as_r_scalar(vector_length(x));
+  return as_vector(vec::length(x));
 }
 
 [[cpp11::register]]
 SEXP cpp_address(SEXP x){
-  return as_r_scalar(address(x));
+  return as_vector(address(x));
 }
 
 // Copy atomic elements from source to target
@@ -43,34 +48,34 @@ void cpp_set_copy_elements(SEXP source, SEXP target){
   }
   case LGLSXP:
   case INTSXP: {
-    int *p_source = INTEGER(source);
-    int *p_target = INTEGER(target);
+    int *p_source = integer_ptr(source);
+    int *p_target = integer_ptr(target);
     safe_memmove(&p_target[0], &p_source[0], n * sizeof(int));
     break;
   }
   case REALSXP: {
-    double *p_source = REAL(source);
-    double *p_target = REAL(target);
+    double *p_source = real_ptr(source);
+    double *p_target = real_ptr(target);
     safe_memmove(&p_target[0], &p_source[0], n * sizeof(double));
     break;
   }
   case STRSXP: {
-    const SEXP *p_source = STRING_PTR_RO(source);
+    const r_string_t *p_source = string_ptr_ro(source);
     for (R_xlen_t i = 0; i < n; ++i){
-      SET_STRING_ELT(target, i, p_source[i]);
+      set_value<r_string_t>(target, i, p_source[i]);
     }
     break;
   }
   case CPLXSXP: {
-    Rcomplex *p_source = COMPLEX(source);
-    Rcomplex *p_target = COMPLEX(target);
-    safe_memmove(&p_target[0], &p_source[0], n * sizeof(Rcomplex));
+    r_complex_t *p_source = complex_ptr(source);
+    r_complex_t *p_target = complex_ptr(target);
+    safe_memmove(&p_target[0], &p_source[0], n * sizeof(r_complex_t));
     break;
   }
   case RAWSXP: {
-    Rbyte *p_source = RAW(source);
-    Rbyte *p_target = RAW(target);
-    safe_memmove(&p_target[0], &p_source[0], n * sizeof(Rbyte));
+    r_byte_t *p_source = raw_ptr(source);
+    r_byte_t *p_target = raw_ptr(target);
+    safe_memmove(&p_target[0], &p_source[0], n * sizeof(r_byte_t));
     break;
   }
   default: {
@@ -83,7 +88,7 @@ void cpp_set_copy_elements(SEXP source, SEXP target){
 
 [[cpp11::register]]
 SEXP r_copy(SEXP x){
-  return Rf_duplicate(x);
+  return vec::deep_copy(x);
 }
 
 
@@ -91,7 +96,7 @@ SEXP r_copy(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_shallow_copy(SEXP x){
-  return Rf_shallow_duplicate(x);
+  return vec::shallow_copy(x);
 }
 
 
@@ -102,8 +107,8 @@ SEXP cpp_semi_copy(SEXP x){
 
   // If no attributes then we can just full-copy immediately
 
-  if (is_null(ATTRIB(x))){
-    return Rf_duplicate(x);
+  if (!has_attrs(x)){
+    return vec::deep_copy(x);
   }
 
   bool altrep = ALTREP(x);
@@ -113,10 +118,10 @@ SEXP cpp_semi_copy(SEXP x){
     // Lists
 
     R_xlen_t n = Rf_xlength(x);
-    SEXP out = SHIELD(new_vec(VECSXP, n));
-    const SEXP *p_x = LIST_PTR_RO(x);
+    SEXP out = SHIELD(new_list(n));
+    const SEXP *p_x = list_ptr_ro(x);
     for (R_xlen_t i = 0; i < n; ++i){
-      SET_VECTOR_ELT(out, i, Rf_duplicate(p_x[i]));
+      SET_VECTOR_ELT(out, i, vec::deep_copy(p_x[i]));
     }
     SHALLOW_DUPLICATE_ATTRIB(out, x);
     YIELD(1);
@@ -125,7 +130,7 @@ SEXP cpp_semi_copy(SEXP x){
 
     // Atomic vectors
 
-    SEXP out = SHIELD(new_vec(TYPEOF(x), Rf_xlength(x)));
+    SEXP out = SHIELD(internal::new_vec(TYPEOF(x), Rf_xlength(x)));
     cpp_set_copy_elements(x, out);
     SHALLOW_DUPLICATE_ATTRIB(out, x);
     YIELD(1);
@@ -136,9 +141,9 @@ SEXP cpp_semi_copy(SEXP x){
     // This method sometimes full copies twice
     // So I don't use it for non-ALTREP atomic vectors
 
-    SEXP out = SHIELD(Rf_shallow_duplicate(x));
-    clear_attributes(out);
-    SHIELD(out = Rf_duplicate(out));
+    SEXP out = SHIELD(vec::shallow_copy(x));
+    attr::clear_attrs(out);
+    SHIELD(out = vec::deep_copy(out));
     SHALLOW_DUPLICATE_ATTRIB(out, x);
     YIELD(2);
     return out;
@@ -156,29 +161,27 @@ double cpp_sum(SEXP x){
   case LGLSXP:
   case INTSXP: {
 
-    const int *p_x = INTEGER(x);
+    const int *p_x = integer_ptr(x);
 
-    OMP_FOR_SIMD
     for (R_xlen_t i = 0; i < n; ++i){
-      sum = is_r_na(sum) || is_r_na(p_x[i]) ? NA_REAL : sum + p_x[i];
+      sum = is_r_na(sum) || is_r_na(p_x[i]) ? na::real : sum + p_x[i];
     }
     break;
   }
   case CHEAPR_INT64SXP: {
 
-    const int64_t *p_x = INTEGER64_PTR_RO(x);
+    const int64_t *p_x = integer64_ptr_ro(x);
 
-    OMP_FOR_SIMD
     for (R_xlen_t i = 0; i < n; ++i){
-      sum = is_r_na(sum) || is_r_na(p_x[i]) ? NA_REAL : sum + p_x[i];
+      sum = is_r_na(sum) || is_r_na(p_x[i]) ? na::real : sum + p_x[i];
     }
     break;
   }
   default: {
 
-    const double *p_x = REAL(x);
+    const double *p_x = real_ptr(x);
 
-    OMP_FOR_SIMD
+    #pragma omp simd reduction(+:sum)
     for (R_xlen_t i = 0; i < n; ++i) sum += p_x[i];
     break;
   }
@@ -191,9 +194,8 @@ SEXP cpp_range(SEXP x){
 
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out = SHIELD(new_vec(REALSXP, 2));
-  double lo = R_PosInf;
-  double hi = R_NegInf;
+  double lo = r_limits::r_pos_inf;
+  double hi = r_limits::r_neg_inf;
 
   if (n > 0){
     switch (CHEAPR_TYPEOF(x)){
@@ -201,46 +203,46 @@ SEXP cpp_range(SEXP x){
     case LGLSXP:
     case INTSXP: {
 
-      const int *p_x = INTEGER_RO(x);
+      const int *p_x = integer_ptr_ro(x);
       int min = std::numeric_limits<int>::max();
       int max = std::numeric_limits<int>::min();
 
-      OMP_FOR_SIMD
+      OMP_SIMD
       for (R_xlen_t i = 0; i < n; ++i){
         min = std::min(min, p_x[i]);
         max = std::max(max, p_x[i]);
       }
-      lo = is_r_na(min) ? NA_REAL : min;
-      hi = is_r_na(min) ? NA_REAL : max;
+      lo = is_r_na(min) ? na::real : min;
+      hi = is_r_na(min) ? na::real : max;
       break;
     }
     case CHEAPR_INT64SXP: {
 
-      const int64_t *p_x = INTEGER64_PTR_RO(x);
+      const int64_t *p_x = integer64_ptr_ro(x);
 
       int64_t min = std::numeric_limits<int64_t>::max();
       int64_t max = std::numeric_limits<int64_t>::min();
 
-      OMP_FOR_SIMD
+      OMP_SIMD
       for (R_xlen_t i = 0; i < n; ++i){
         min = std::min(min, p_x[i]);
         max = std::max(max, p_x[i]);
       }
-      lo = is_r_na(min) ? NA_REAL : min;
-      hi = is_r_na(min) ? NA_REAL : max;
+      lo = is_r_na(min) ? na::real : min;
+      hi = is_r_na(min) ? na::real : max;
       break;
     }
     default: {
 
-      const double *p_x = REAL_RO(x);
+      const double *p_x = real_ptr_ro(x);
 
-      double min = R_PosInf;
-      double max = R_NegInf;
+      double min = r_limits::r_pos_inf;
+      double max = r_limits::r_neg_inf;
 
       for (R_xlen_t i = 0; i < n; ++i){
         if (is_r_na(p_x[i])){
-          min = NA_REAL;
-          max = NA_REAL;
+          min = na::real;
+          max = na::real;
           break;
         }
         min = std::min(min, p_x[i]);
@@ -252,17 +254,14 @@ SEXP cpp_range(SEXP x){
     }
     }
   }
-  SET_REAL_ELT(out, 0, lo);
-  SET_REAL_ELT(out, 1, hi);
-  YIELD(1);
-  return out;
+  return combine(lo, hi);
 }
 
 double cpp_min(SEXP x){
-  return REAL_RO(cpp_range(x))[0];
+  return real_ptr_ro(cpp_range(x))[0];
 }
 double cpp_max(SEXP x){
-  return REAL_RO(cpp_range(x))[1];
+  return real_ptr_ro(cpp_range(x))[1];
 }
 
 // Internal-only function
@@ -281,7 +280,7 @@ double var_sum_squared_diff(SEXP x, double mu){
     switch (TYPEOF(x)){
 
     case INTSXP: {
-      const int *p_x = INTEGER(x);
+      const int *p_x = integer_ptr(x);
       for (R_xlen_t i = 0; i < n; ++i){
         if (is_r_na(p_x[i])) continue;
         out += std::pow(p_x[i] - mu, 2);
@@ -289,7 +288,7 @@ double var_sum_squared_diff(SEXP x, double mu){
       break;
     }
     default: {
-      const double *p_x = REAL(x);
+      const double *p_x = real_ptr(x);
       for (R_xlen_t i = 0; i < n; ++i){
         if (is_r_na(p_x[i])) continue;
         out += std::pow(p_x[i] - mu, 2);
@@ -298,7 +297,7 @@ double var_sum_squared_diff(SEXP x, double mu){
     }
     }
   } else {
-    out = NA_REAL;
+    out = na::real;
   }
   return out;
 }
@@ -308,52 +307,52 @@ double var_sum_squared_diff(SEXP x, double mu){
 // The main difference is that codes or breaks can be returned efficiently
 // Values outside the (right or left) intervals can be included too
 
-#define CHEAPR_BIN_CODES                                                                                \
-for (R_xlen_t i = 0; i < n; ++i) {                                                                      \
-  p_out[i] = na_type(p_out[0]);                                                                         \
+#define CHEAPR_BIN_CODES(na)                                                                                  \
+for (R_xlen_t i = 0; i < n; ++i) {                                                                        \
+  p_out[i] = na;                                               \
   if (!is_r_na(p_x[i])) {                                                                                 \
-    lo = 0;                                                                                             \
-    hi = nb1;                                                                                           \
-    if ( (include_oob && !include_border && (left ? p_x[i] == p_b[hi] : p_x[i] == p_b[lo])) ||          \
-         ((include_oob && (left ? p_x[i] > p_b[hi] : p_x[i] < p_b[lo])))){                              \
-      p_out[i] = (left ? hi : lo) + 1;                                                                  \
-    }                                                                                                   \
-    else if (!(p_x[i] < p_b[lo] || p_x[i] > p_b[hi] ||                                                  \
-             (p_x[i] == p_b[left ? hi : lo] && !include_border))){                                      \
-      while (hi - lo >= 2) {                                                                            \
-        cutpoint = (hi + lo)/2;                                                                         \
-        if (p_x[i] > p_b[cutpoint] || (left && p_x[i] == p_b[cutpoint]))                                \
-          lo = cutpoint;                                                                                \
-        else                                                                                            \
-          hi = cutpoint;                                                                                \
-      }                                                                                                 \
-      p_out[i] = lo + 1 + (right && include_oob);                                                       \
-    }                                                                                                   \
-  }                                                                                                     \
+    lo = 0;                                                                                               \
+    hi = nb1;                                                                                             \
+    if ( (include_oob && !include_border && (left ? p_x[i] == p_b[hi] : p_x[i] == p_b[lo])) ||            \
+         ((include_oob && (left ? p_x[i] > p_b[hi] : p_x[i] < p_b[lo])))){                                \
+      p_out[i] = (left ? hi : lo) + 1;                                                                    \
+    }                                                                                                     \
+    else if (!(p_x[i] < p_b[lo] || p_x[i] > p_b[hi] ||                                                    \
+             (p_x[i] == p_b[left ? hi : lo] && !include_border))){                                        \
+      while (hi - lo >= 2) {                                                                              \
+        cutpoint = (hi + lo)/2;                                                                           \
+        if (p_x[i] > p_b[cutpoint] || (left && p_x[i] == p_b[cutpoint]))                                  \
+          lo = cutpoint;                                                                                  \
+        else                                                                                              \
+          hi = cutpoint;                                                                                  \
+      }                                                                                                   \
+      p_out[i] = lo + 1 + (right && include_oob);                                                         \
+    }                                                                                                     \
+  }                                                                                                       \
 }
 
-#define CHEAPR_BIN_NCODES                                                                                                            \
-for (R_xlen_t i = 0; i < n; ++i) {                                                                                                   \
-  p_out[i] = na_type(p_out[0]);                                                                                                      \
+#define CHEAPR_BIN_NCODES(na)                                                                                                              \
+for (R_xlen_t i = 0; i < n; ++i) {                                                                                                     \
+  p_out[i] = na;                                               \
   if (!is_r_na(p_x[i])) {                                                                                                              \
-    lo = 0;                                                                                                                          \
-    hi = nb1;                                                                                                                        \
-    if ( (include_oob && !include_border && (left ? p_x[i] == p_b[hi] : p_x[i] == p_b[lo])) ||                                       \
-         ((include_oob && (left ? p_x[i] > p_b[hi] : p_x[i] < p_b[lo])))){                                                           \
-      p_out[i] = p_b[(left ? hi : lo)];                                                                                              \
-    }                                                                                                                                \
-    else if (!(p_x[i] < p_b[lo] || p_x[i] > p_b[hi] ||                                                                               \
-             (p_x[i] == p_b[left ? hi : lo] && !include_border))){                                                                   \
-      while (hi - lo >= 2) {                                                                                                         \
-        cutpoint = (hi + lo)/2;                                                                                                      \
-        if (p_x[i] > p_b[cutpoint] || (left && p_x[i] == p_b[cutpoint]))                                                             \
-          lo = cutpoint;                                                                                                             \
-        else                                                                                                                         \
-          hi = cutpoint;                                                                                                             \
-      }                                                                                                                              \
-      p_out[i] = p_b[lo + (right && include_oob)];                                                                                   \
-    }                                                                                                                                \
-  }                                                                                                                                  \
+    lo = 0;                                                                                                                            \
+    hi = nb1;                                                                                                                          \
+    if ( (include_oob && !include_border && (left ? p_x[i] == p_b[hi] : p_x[i] == p_b[lo])) ||                                         \
+         ((include_oob && (left ? p_x[i] > p_b[hi] : p_x[i] < p_b[lo])))){                                                             \
+      p_out[i] = p_b[(left ? hi : lo)];                                                                                                \
+    }                                                                                                                                  \
+    else if (!(p_x[i] < p_b[lo] || p_x[i] > p_b[hi] ||                                                                                 \
+             (p_x[i] == p_b[left ? hi : lo] && !include_border))){                                                                     \
+      while (hi - lo >= 2) {                                                                                                           \
+        cutpoint = (hi + lo)/2;                                                                                                        \
+        if (p_x[i] > p_b[cutpoint] || (left && p_x[i] == p_b[cutpoint]))                                                               \
+          lo = cutpoint;                                                                                                               \
+        else                                                                                                                           \
+          hi = cutpoint;                                                                                                               \
+      }                                                                                                                                \
+      p_out[i] = p_b[lo + (right && include_oob)];                                                                                     \
+    }                                                                                                                                  \
+  }                                                                                                                                    \
 }
 
 [[cpp11::register]]
@@ -369,42 +368,42 @@ SEXP cpp_bin(SEXP x, SEXP breaks, bool codes, bool right,
   switch(TYPEOF(x)){
   case INTSXP: {
     if (codes){
-    SEXP out = SHIELD(new_vec(INTSXP, n));
-    SHIELD(breaks = coerce_vec(breaks, REALSXP));
-    const int *p_x = INTEGER(x);
-    const double *p_b = REAL(breaks);
-    int* RESTRICT p_out = INTEGER(out);
-    CHEAPR_BIN_CODES;
+    SEXP out = SHIELD(vec::new_vector<int>(n));
+    SHIELD(breaks = vec::coerce_vec(breaks, REALSXP));
+    const int *p_x = integer_ptr(x);
+    const double *p_b = real_ptr(breaks);
+    int* RESTRICT p_out = vector_ptr<int>(out);
+    CHEAPR_BIN_CODES(na_value<int>())
     YIELD(2);
     return out;
   } else {
     SEXP out = SHIELD(cpp_semi_copy(x));
-    SHIELD(breaks = coerce_vec(breaks, REALSXP));
-    const int *p_x = INTEGER(x);
-    const double *p_b = REAL(breaks);
-    int* RESTRICT p_out = INTEGER(out);
-    CHEAPR_BIN_NCODES
+    SHIELD(breaks = vec::coerce_vec(breaks, REALSXP));
+    const int *p_x = integer_ptr(x);
+    const double *p_b = real_ptr(breaks);
+    int* RESTRICT p_out = integer_ptr(out);
+    CHEAPR_BIN_NCODES(na_value<int>())
     YIELD(2);
     return out;
   }
   }
   default: {
     if (codes){
-    SEXP out = SHIELD(new_vec(INTSXP, n));
-    SHIELD(breaks = coerce_vec(breaks, REALSXP));
-    const double *p_x = REAL(x);
-    const double *p_b = REAL(breaks);
-    int* RESTRICT p_out = INTEGER(out);
-    CHEAPR_BIN_CODES;
+    SEXP out = SHIELD(vec::new_vector<int>(n));
+    SHIELD(breaks = vec::coerce_vec(breaks, REALSXP));
+    const double *p_x = real_ptr(x);
+    const double *p_b = real_ptr(breaks);
+    int* RESTRICT p_out = integer_ptr(out);
+    CHEAPR_BIN_CODES(na_value<int>())
     YIELD(2);
     return out;
   } else {
     SEXP out = SHIELD(cpp_semi_copy(x));
-    SHIELD(breaks = coerce_vec(breaks, REALSXP));
-    const double *p_x = REAL(x);
-    const double *p_b = REAL(breaks);
-    double* RESTRICT p_out = REAL(out);
-    CHEAPR_BIN_NCODES
+    SHIELD(breaks = vec::coerce_vec(breaks, REALSXP));
+    const double *p_x = real_ptr(x);
+    const double *p_b = real_ptr(breaks);
+    double* RESTRICT p_out = real_ptr(out);
+    CHEAPR_BIN_NCODES(na_value<double>())
     YIELD(2);
     return out;
   }
@@ -417,53 +416,36 @@ SEXP cpp_bin(SEXP x, SEXP breaks, bool codes, bool right,
 [[cpp11::register]]
 SEXP cpp_lgl_count(SEXP x){
   R_xlen_t n = Rf_xlength(x);
-  int n_cores = n >= CHEAPR_OMP_THRESHOLD ? num_cores() : 1;
+  int n_threads = calc_threads(n);
 
-  const r_boolean *p_x = BOOLEAN_RO(x);
+  const r_bool_t *p_x = logical_ptr_ro(x);
 
   R_xlen_t i;
   R_xlen_t ntrue = 0, nfalse = 0;
 
-  if (n_cores > 1){
-#pragma omp parallel for simd num_threads(n_cores) reduction(+:ntrue, nfalse)
+  if (n_threads > 1){
+#pragma omp parallel for simd num_threads(n_threads) reduction(+:ntrue, nfalse)
     for (i = 0; i < n; ++i){
-      ntrue += p_x[i] == r_true;
-      nfalse += p_x[i] == r_false;
+      ntrue += is_r_true(p_x[i]);
+      nfalse += is_r_false(p_x[i]);
     }
   } else {
-    OMP_FOR_SIMD
+#pragma omp simd reduction(+:ntrue, nfalse)
     for (i = 0; i < n; ++i){
-      ntrue += p_x[i] == r_true;
-      nfalse += p_x[i] == r_false;
+      ntrue += is_r_true(p_x[i]);
+      nfalse += is_r_false(p_x[i]);
     }
   }
 
   R_xlen_t nna = n - ntrue - nfalse;
 
-  SEXP names = SHIELD(new_r_chars("true", "false", "na"));
-  SEXP out;
+  SEXP out = SHIELD(combine(
+    arg("true") = ntrue,
+    arg("false") = nfalse,
+    arg("na") = nna
+  ));
 
-  if (n > INTEGER_MAX){
-    out = SHIELD(cpp11::writable::doubles(
-    {
-      static_cast<double>(ntrue),
-      static_cast<double>(nfalse),
-      static_cast<double>(nna)
-    }
-    ));
-  } else {
-    out = SHIELD(cpp11::writable::integers(
-    {
-      static_cast<int>(ntrue),
-      static_cast<int>(nfalse),
-      static_cast<int>(nna)
-    }
-    ));
-  }
-
-  set_names(out, names);
-
-  YIELD(2);
+  YIELD(1);
   return out;
 }
 
@@ -479,51 +461,23 @@ SEXP cpp_set_or(SEXP x, SEXP y){
 
   R_xlen_t i, yi;
 
-  int *p_x = LOGICAL(x);
-  const int *p_y = LOGICAL(y);
+  r_bool_t *p_x = logical_ptr(x);
+  const r_bool_t *p_y = logical_ptr_ro(y);
 
   for (i = yi = 0; i < n; yi = (++yi == yn) ? 0 : yi, ++i){
 
-    if (p_x[i] != 1){
-      if (p_y[yi] == 1){
-        p_x[i] = 1;
-      } else if ((p_x[i] == NA_LOGICAL) || (p_y[yi] == NA_LOGICAL)){
-        p_x[i] = NA_LOGICAL;
-      } else if (p_x[i] == 1 || p_y[yi] == 1){
-        p_x[i] = 1;
+    if (!is_r_true(p_x[i])){
+      if (is_r_true(p_y[yi])){
+        p_x[i] = r_true;
+      } else if (is_r_na(p_x[i]) || is_r_na(p_y[yi])){
+        p_x[i] = na::logical;
+      } else if (is_r_true(p_x[i]) || is_r_true(p_y[yi])){
+        p_x[i] = r_true;
       }
     }
   }
   return x;
 }
-
-// SEXP cpp_set_and(SEXP x, SEXP y){
-//
-//   R_xlen_t xn = Rf_xlength(x);
-//   R_xlen_t yn = Rf_xlength(y);
-//
-//   R_xlen_t n = xn == 0 || yn == 0 ? 0 : xn;
-//
-//   R_xlen_t i, yi;
-//
-//   int *p_x = LOGICAL(x);
-//   const int *p_y = LOGICAL_RO(y);
-//
-//   for (i = yi = 0; i < n; yi = (++yi == yn) ? 0 : yi, ++i){
-//
-//     if (p_x[i] != 0){
-//       if (p_y[yi] == 0){
-//         p_x[i] = 0;
-//       } else if ((p_x[i] == NA_LOGICAL) || (p_y[yi] == NA_LOGICAL)){
-//         p_x[i] = NA_LOGICAL;
-//       } else if (p_x[i] == 1 && p_y[yi] == 1){
-//         p_x[i] = 1;
-//       }
-//     }
-//   }
-//
-//   return x;
-// }
 
 // Basic growth rate
 // i.e the expected percent change per unit of time
@@ -539,11 +493,11 @@ double growth_rate(double a, double b, double n){
   if (n < 1.0){
     Rf_error("n must be >= 1");
   }
-  if (n == R_PosInf){
+  if (n == r_limits::r_pos_inf){
     Rf_error("n must be finite positive");
   }
   if (n == 1.0){
-    return NA_REAL;
+    return na::real;
   }
   if (a == 0.0 && b == 0.0){
     return 1.0;
@@ -556,50 +510,38 @@ double growth_rate(double a, double b, double n){
 SEXP cpp_growth_rate(SEXP x){
   R_xlen_t n = Rf_xlength(x);
   if (n == 0){
-    return new_vec(REALSXP, 0);
+    return new_vector<double>(0);
   }
   if (n == 1){
-    return as_r_scalar(NA_REAL);
+    return as_vector(na::real);
   }
   double a, b;
   switch(CHEAPR_TYPEOF(x)){
   case LGLSXP:
   case INTSXP: {
-    int x_n = INTEGER(x)[n - 1];
-    int x_1 = INTEGER(x)[0];
-    a = as_double(x_1);
-    b = as_double(x_n);
+    int x_n = integer_ptr(x)[n - 1];
+    int x_1 = integer_ptr(x)[0];
+    a = r_cast<double>(x_1);
+    b = r_cast<double>(x_n);
     break;
   }
   case CHEAPR_INT64SXP: {
-    int64_t x_n = INTEGER64_PTR(x)[n - 1];
-    int64_t x_1 = INTEGER64_PTR(x)[0];
-    a = as_double(x_1);
-    b = as_double(x_n);
+    int64_t x_n = integer64_ptr(x)[n - 1];
+    int64_t x_1 = integer64_ptr(x)[0];
+    a = r_cast<double>(x_1);
+    b = r_cast<double>(x_n);
     break;
   }
   case REALSXP: {
-    b = REAL(x)[n - 1];
-    a = REAL(x)[0];
+    b = real_ptr(x)[n - 1];
+    a = real_ptr(x)[0];
     break;
   }
   default: {
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-  return as_r_scalar(growth_rate(a, b, n));
-}
-
-SEXP create_df_row_names(int n){
-  if (n > 0){
-    SEXP out = SHIELD(new_vec(INTSXP, 2));
-    INTEGER(out)[0] = NA_INTEGER;
-    INTEGER(out)[1] = -n;
-    YIELD(1);
-    return out;
-  } else {
-    return new_vec(INTSXP, 0);
-  }
+  return as_vector(growth_rate(a, b, n));
 }
 
 [[cpp11::register]]
@@ -621,41 +563,41 @@ SEXP cpp_name_repair(SEXP names, SEXP dup_sep, SEXP empty_sep){
   SEXP is_dup_from_last = SHIELD(Rf_duplicated(names, TRUE)); ++NP;
   cpp_set_or(is_dup, is_dup_from_last);
 
-  SEXP r_true = SHIELD(as_r_scalar(true)); ++NP;
-  SEXP dup_locs = SHIELD(cpp_which_val(is_dup, r_true, false)); ++NP;
+  SEXP scalar_true = SHIELD(as_vector(r_true)); ++NP;
+  SEXP dup_locs = SHIELD(cpp_which_val(is_dup, scalar_true, false)); ++NP;
 
   int n_dups = Rf_length(dup_locs);
 
-  SEXP out = SHIELD(new_vec(STRSXP, n)); ++NP;
+  SEXP out = SHIELD(new_vector<r_string_t>(n)); ++NP;
   cpp_set_copy_elements(names, out);
 
-  SEXP temp = R_NilValue;
-  SEXP replace = R_NilValue;
+  SEXP temp = r_null;
+  SEXP replace = r_null;
 
   if (n_dups > 0){
     temp = SHIELD(sset_vec(names, dup_locs, true)); ++NP;
-    replace = SHIELD(r_paste(R_BlankScalarString, R_NilValue, temp, dup_sep, dup_locs)); ++NP;
-    static_cast<void>(cpp_replace(out, dup_locs, replace, true, false));
+    replace = SHIELD(r_paste(R_BlankScalarString, r_null, temp, dup_sep, dup_locs)); ++NP;
+    replace_in_place(out, dup_locs, replace, false);
   }
 
-  SEXP is_empty = SHIELD(new_vec(LGLSXP, n)); ++NP;
-  int *p_is_empty = LOGICAL(is_empty);
+  SEXP is_empty = SHIELD(new_vector<r_bool_t>(n)); ++NP;
+  int *p_is_empty = integer_ptr(is_empty);
   bool empty;
   int n_empty = 0;
 
   for (int i = 0; i < n; ++i){
-    empty = (STRING_ELT(names, i) == R_BlankString);
+    empty = (STRING_ELT(names, i) == blank_r_string);
     n_empty += empty;
     p_is_empty[i] = empty;
   }
 
-  SEXP r_n_empty = SHIELD(as_r_scalar(n_empty)); ++NP;
+  SEXP r_n_empty = SHIELD(as_vector(n_empty)); ++NP;
 
   if (n_empty > 0){
-    SEXP empty_locs = SHIELD(cpp_val_find(is_empty, r_true, false, r_n_empty)); ++NP;
+    SEXP empty_locs = SHIELD(cpp_val_find(is_empty, scalar_true, false, r_n_empty)); ++NP;
     temp = SHIELD(sset_vec(names, empty_locs, true)); ++NP;
-    replace = SHIELD(r_paste(R_BlankScalarString, R_NilValue, temp, empty_sep, empty_locs)); ++NP;
-    static_cast<void>(cpp_replace(out, empty_locs, replace, true, false));
+    replace = SHIELD(r_paste(R_BlankScalarString, r_null, temp, empty_sep, empty_locs)); ++NP;
+    replace_in_place(out, empty_locs, replace, false);
   }
 
   YIELD(NP);
@@ -669,54 +611,61 @@ SEXP cpp_rebuild(SEXP target, SEXP source, SEXP target_attr_names,
   int32_t NP = 0;
 
   if (shallow_copy){
-    SHIELD(target = Rf_shallow_duplicate(target)); ++NP;
-  }
-
-  if (address_equal(target, source)){
+    SHIELD(target = cheapr::vec::shallow_copy(target)); ++NP;
+  } else if (address_equal(target, source)){
     YIELD(NP);
     return target;
   }
 
-  SEXP target_attrs = ATTRIB(target);
-  SEXP source_attrs = ATTRIB(source);
+
+  SEXP target_attrs = SHIELD(get_attrs(target)); ++NP;
+  SEXP source_attrs = SHIELD(get_attrs(source)); ++NP;
+
+  SEXP target_nms = SHIELD(attr::get_old_names(target_attrs)); ++NP;
+  SEXP source_nms = SHIELD(attr::get_old_names(source_attrs)); ++NP;
+
+
+  const r_string_t *p_target_nms = string_ptr_ro(target_nms);
+  const r_string_t *p_source_nms = string_ptr_ro(source_nms);
+
+  int n_target_nms = Rf_length(target_nms);
+  int n_source_nms = Rf_length(source_nms);
 
   // Start from clean slate - no attributes
-  clear_attributes(target);
+  attr::clear_attrs(target);
 
-  SEXP tag = R_NilValue;
-  SEXP current = R_NilValue;
+  r_string_t curr_tag;
 
-  const SEXP *p_ta = STRING_PTR_RO(target_attr_names);
-  const SEXP *p_sa = STRING_PTR_RO(source_attr_names);
+  const r_string_t *p_ta = string_ptr_ro(target_attr_names);
+  const r_string_t *p_sa = string_ptr_ro(source_attr_names);
 
   const int n_target = Rf_length(target_attr_names);
   const int n_source = Rf_length(source_attr_names);
 
-  for (int i = 0; i < n_target; ++i){
-    current = target_attrs;
-    while (!is_null(current)){
 
-      tag = TAG(current);
+  // Source attributes to keep
+  for (int i = 0; i < n_source; ++i){
+    for (int j = 0; j < n_source_nms; ++j){
 
-      if (PRINTNAME(tag) == p_ta[i]){
-        Rf_setAttrib(target, tag, CAR(current));
+      curr_tag = p_source_nms[j];
+
+      if (curr_tag == p_sa[i]){
+        set_attr(target, r_cast<r_symbol_t>(curr_tag), VECTOR_ELT(source_attrs, j));
         break;
       }
-      current = CDR(current);
     }
   }
 
-  for (int i = 0; i < n_source; ++i){
-    current = source_attrs;
-    while (!is_null(current)){
+  // Target attributes to keep
+  for (int i = 0; i < n_target; ++i){
+    for (int j = 0; j < n_target_nms; ++j){
 
-      tag = TAG(current);
+      curr_tag = p_target_nms[j];
 
-      if (PRINTNAME(tag) == p_sa[i]){
-        Rf_setAttrib(target, tag, CAR(current));
+      if (curr_tag == p_ta[i]){
+        set_attr(target, r_cast<r_symbol_t>(curr_tag), VECTOR_ELT(target_attrs, j));
         break;
       }
-      current = CDR(current);
     }
   }
 
@@ -729,21 +678,19 @@ SEXP cpp_rebuild(SEXP target, SEXP source, SEXP target_attr_names,
 [[cpp11::register]]
 SEXP cpp_tabulate(SEXP x, uint32_t n_bins){
 
-  if (n_bins > INTEGER_MAX){
+  if (n_bins > r_limits::r_int_max){
     Rf_error("`n_bins` must be < 2^31 in %s", __func__);
   }
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out = SHIELD(new_vec(INTSXP, n_bins));
-  const int *p_x = INTEGER_RO(x);
-  int* RESTRICT p_out = INTEGER(out);
-
   // Initialise counts to 0
-  std::fill(p_out, p_out + n_bins, 0);
+  SEXP out = SHIELD(vec::new_vector<int>(n_bins, 0));
+  const int *p_x = integer_ptr_ro(x);
+  int* RESTRICT p_out = integer_ptr(out);
 
   uint32_t one = 1;
 
-  OMP_FOR_SIMD
+  OMP_SIMD
   for (R_xlen_t i = 0 ; i < n; ++i){
     if ((static_cast<uint32_t>(p_x[i]) - one) < n_bins){
       ++p_out[p_x[i] - 1];
@@ -760,73 +707,93 @@ SEXP cpp_tabulate(SEXP x, uint32_t n_bins){
 
 [[cpp11::register]]
 SEXP cpp_is_whole_number(SEXP x, double tol_, bool na_rm_){
-  return as_r_scalar(static_cast<int>(vec_is_whole_number(x, tol_, na_rm_)));
+  return as_vector(vec::all_whole_numbers(x, tol_, na_rm_));
 }
 
 SEXP match(SEXP y, SEXP x, int no_match){
   if (Rf_xlength(x) < 100000 && Rf_xlength(y) < 100000){
     return Rf_match(y, x, no_match);
   } else {
-    return cheapr_fast_match(x, y, no_match);
+    return eval_pkg_fun("fast_match", "cheapr", env::base_env, x, y, no_match);
   }
 }
 
 SEXP get_vec_names(SEXP x){
-  if (Rf_isVectorAtomic(x)){
-    return get_names(x);
+  if (vec::is_atomic(x)){
+    return get_old_names(x);
   } else {
     switch(get_r_type(x)){
-    case r_null:
-    case r_df: {
-      return R_NilValue;
+    case R_null:
+    case R_df: {
+      return r_null;
     }
-    case r_list: {
-      return get_names(x);
+    case R_list: {
+      return get_old_names(x);
     }
-    case r_unk: {
-      SEXP r_names_fn = SHIELD(find_pkg_fun("names", "base", false));
-      SEXP expr = SHIELD(Rf_lang2(r_names_fn, x));
-      SEXP out = SHIELD(Rf_eval(expr, R_GetCurrentEnv()));
-      YIELD(3);
-      return out;
+    case R_unk: {
+      return eval_pkg_fun("names", "base", env::base_env, x);
     }
     }
-    return R_NilValue;
+    return r_null;
   }
 }
 
-SEXP set_vec_names(SEXP x, SEXP names){
+void set_vec_names(SEXP x, SEXP names){
   if (is_null(names)){
-    return x;
-  } else if (Rf_isVectorAtomic(x)){
-    SEXP out = SHIELD(shallow_copy(x));
-    Rf_namesgets(out, names);
-    YIELD(1);
-    return out;
+    return;
+  } else if (vec::is_atomic(x)){
+    attr::set_old_names(x, names);
+    return;
   } else {
     switch(get_r_type(x)){
-    case r_null:
-    case r_df: {
-      return x;
+    case R_null:
+    case R_df: {
+      return;
     }
-    case r_list: {
-      SEXP out = SHIELD(shallow_copy(x));
-      Rf_namesgets(out, names);
-      YIELD(1);
-      return out;
+    case R_list: {
+      attr::set_old_names(x, names);
+      return;
     }
-    case r_unk: {
-      SEXP r_names_fn = SHIELD(find_pkg_fun("names<-", "base", false));
-      SEXP expr = SHIELD(Rf_lang3(r_names_fn, x, names));
-      SEXP out = SHIELD(Rf_eval(expr, R_GetCurrentEnv()));
-      YIELD(3);
-      return out;
+    default: {
+      SEXP vec_with_names = SHIELD(eval_pkg_fun("names<-", "base", env::base_env, x, names));
+      SEXP attrs = SHIELD(get_attrs(vec_with_names));
+      attr::set_attrs(x, attrs);
+      YIELD(2);
+      return;
     }
     }
-    return R_NilValue;
   }
 }
 
 bool vec_has_names(SEXP x){
   return !is_null(get_vec_names(x));
 }
+
+[[cpp11::register]]
+SEXP cheapr_do_memory_leak_test(){
+
+  // To be run in valgrind
+
+  // Check that 4000 bytes are not lost
+
+  std::vector<int32_t> ints(1000);
+  SEXP r_ints = r_safe(Rf_protect)(r_safe(new_vector<int>)(ints.size()));
+  SEXP seq = r_safe(Rf_protect)(r_safe(cpp_seq_len)(ints.size()));
+  SEXP repl = r_safe(Rf_protect)(r_safe(as_vector)(-1));
+  r_safe(replace_in_place)(r_ints, seq, repl, true);
+  r_safe(Rf_unprotect)(3);
+  r_safe(Rf_error)("%s", "Expected error! This should not cause a C++ memory leak");
+  return r_ints; // Never reached
+}
+
+// Below will trigger a memory leak, only use for testing purposes
+// SEXP cheapr_unsafe_init_memory_leak(){
+//   std::vector<int> ints(1000);
+//   SEXP r_ints = r_safe(SHIELD)(r_safe(new_vec)(INTSXP, ints.size()));
+//   SEXP seq = r_safe(SHIELD)(r_safe(cpp_seq_len)(ints.size()));
+//   SEXP repl = r_safe(SHIELD)(r_safe(make_vec)(-1));
+//   r_safe(replace_in_place)(r_ints, seq, repl, true);
+//   r_safe(YIELD)(3);
+//   Rf_error("%s", "Expected error! This will cause a C++ memory leak");
+//   return r_ints; // Never reached
+// }

@@ -9,15 +9,15 @@ SEXP cpp_int64_to_int(SEXP x){
   }
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out = SHIELD(new_vec(INTSXP, n));
-  int* RESTRICT p_out = INTEGER(out);
+  SEXP out = SHIELD(new_vector<int>(n));
+  int* RESTRICT p_out = integer_ptr(out);
 
-  const int64_t *p_x = INTEGER64_PTR_RO(x);
+  const int64_t *p_x = integer64_ptr_ro(x);
 
-  int64_t int_max = INTEGER_MAX;
+  int64_t int_max = r_limits::r_int_max;
 
   for (R_xlen_t i = 0; i < n; ++i){
-    p_out[i] = is_r_na(p_x[i]) || std::llabs(p_x[i]) > int_max ? NA_INTEGER : p_x[i];
+    p_out[i] = is_r_na(p_x[i]) || std::llabs(p_x[i]) > int_max ? na::integer : p_x[i];
   }
   YIELD(1);
   return out;
@@ -32,15 +32,13 @@ SEXP cpp_int64_to_double(SEXP x){
   }
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out = SHIELD(new_vec(REALSXP, n));
-  double* RESTRICT p_out = REAL(out);
+  SEXP out = SHIELD(new_vector<double>(n));
+  double* RESTRICT p_out = real_ptr(out);
 
-  const int64_t *p_x = INTEGER64_PTR_RO(x);
+  const int64_t *p_x = integer64_ptr_ro(x);
 
-  double repl;
   for (R_xlen_t i = 0; i < n; ++i){
-    repl = is_r_na(p_x[i]) ? NA_REAL : p_x[i];
-    p_out[i] = repl;
+    p_out[i] = r_cast<double>(p_x[i]);
   }
   YIELD(1);
   return out;
@@ -58,10 +56,10 @@ bool cpp_all_integerable(SEXP x){
     break;
   }
   case CHEAPR_INT64SXP: {
-    const int64_t *p_x = INTEGER64_PTR_RO(x);
+    const int64_t *p_x = integer64_ptr_ro(x);
 
-    int64_t int_min = INTEGER_MIN;
-    int64_t int_max = INTEGER_MAX;
+    int64_t int_min = r_limits::r_int_min;
+    int64_t int_max = r_limits::r_int_max;
 
     for (R_xlen_t i = 0; i < n; ++i){
       if (!(is_r_na(p_x[i]) || between(p_x[i], int_min, int_max))){
@@ -72,10 +70,10 @@ bool cpp_all_integerable(SEXP x){
     break;
   }
   case REALSXP: {
-    const double *p_x = REAL_RO(x);
+    const double *p_x = real_ptr_ro(x);
 
-    double int_min = INTEGER_MIN;
-    double int_max = INTEGER_MAX;
+    double int_min = r_limits::r_int_min;
+    double int_max = r_limits::r_int_max;
 
     for (R_xlen_t i = 0; i < n; ++i){
       if (!(is_r_na(p_x[i]) || between(p_x[i], int_min, int_max))){
@@ -109,59 +107,52 @@ SEXP cpp_int64_to_numeric(SEXP x){
 
 [[cpp11::register]]
 SEXP cpp_numeric_to_int64(SEXP x){
+
+  int32_t NP = 0;
   R_xlen_t n = Rf_xlength(x);
 
-  SEXP out;
-  int64_t repl;
+  SEXP out = r_null;
 
   switch (CHEAPR_TYPEOF(x)){
   case INTSXP: {
-    int *p_x = INTEGER(x);
-    out = SHIELD(new_vec(REALSXP, n));
-    int64_t *p_out = INTEGER64_PTR(out);
+    int *p_x = integer_ptr(x);
+    out = SHIELD(new_vector<int64_t>(n)); ++NP;
+    int64_t *p_out = integer64_ptr(out);
     for (R_xlen_t i = 0; i < n; ++i){
-      p_out[i] = as_int64(p_x[i]);
+      p_out[i] = r_cast<int64_t>(p_x[i]);
     }
-    Rf_classgets(out, make_utf8_str("integer64"));
     break;
   }
   case CHEAPR_INT64SXP: {
-    out = SHIELD(x);
+    out = x;
     break;
   }
   case REALSXP: {
-    double *p_x = REAL(x);
-    out = SHIELD(new_vec(REALSXP, n));
-    int64_t *p_out = INTEGER64_PTR(out);
-    double temp;
+    double *p_x = real_ptr(x);
+    out = SHIELD(new_vector<int64_t>(n)); ++NP;
+    int64_t *p_out = integer64_ptr(out);
     for (R_xlen_t i = 0; i < n; ++i){
-      temp = p_x[i];
-      if (is_r_na(temp) || temp == R_PosInf || temp == R_NegInf){
-        repl = NA_INTEGER64;
-      } else {
-        repl = temp;
-      }
-      p_out[i] = repl;
+      p_out[i] = r_cast<int64_t>(p_x[i]);
     }
-    Rf_classgets(out, make_utf8_str("integer64"));
     break;
   }
   default: {
+    YIELD(NP);
     Rf_error("%s cannot handle an object of type %s", __func__, Rf_type2char(TYPEOF(x)));
   }
   }
-  YIELD(1);
+  YIELD(NP);
   return out;
 }
 
 // Found here stackoverflow.com/questions/347949
 template<typename ... Args>
-std::string string_format( const std::string& format, Args ... args){
-  int size_s = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
+std::string string_format(const char *format, Args ... args){
+  int size_s = std::snprintf( nullptr, 0, format, args ... ) + 1; // Extra space for '\0'
   if( size_s <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
   auto size = static_cast<size_t>( size_s );
   std::unique_ptr<char[]> buf( new char[ size ] );
-  std::snprintf( buf.get(), size, format.c_str(), args ... );
+  std::snprintf( buf.get(), size, format, args ... );
   return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
 }
 
@@ -175,49 +166,51 @@ SEXP cpp_format_numeric_as_int64(SEXP x){
   R_xlen_t n = Rf_xlength(x);
 
   SEXP out;
-  std::string s;
 
   switch (CHEAPR_TYPEOF(x)){
   case INTSXP: {
-    out = SHIELD(new_vec(STRSXP, n));
-    int *p_x = INTEGER(x);
+    std::string s;
+    out = SHIELD(new_vector<r_string_t>(n));
+    int *p_x = integer_ptr(x);
 
     for (R_xlen_t i = 0; i < n; ++i){
       if (is_r_na(p_x[i])){
-        SET_STRING_ELT(out, i, NA_STRING);
+        set_value<r_string_t>(out, i, na::string);
       } else {
         int64_t temp = p_x[i];
         s = string_format("%lld", temp);
-        SET_STRING_ELT(out, i, make_utf8_char(s.c_str()));
+        set_value<r_string_t>(out, i, r_cast<r_string_t>(s.c_str()));
       }
     }
     break;
   }
   case CHEAPR_INT64SXP: {
-    out = SHIELD(new_vec(STRSXP, n));
-    int64_t *p_x = INTEGER64_PTR(x);
+    std::string s;
+    out = SHIELD(new_vector<r_string_t>(n));
+    int64_t *p_x = integer64_ptr(x);
 
     for (R_xlen_t i = 0; i < n; ++i){
       if (is_r_na(p_x[i])){
-        SET_STRING_ELT(out, i, NA_STRING);
+        set_value<r_string_t>(out, i, na::string);
       } else {
         int64_t temp = p_x[i];
         s = string_format("%lld", temp);
-        SET_STRING_ELT(out, i, make_utf8_char(s.c_str()));
+        set_value<r_string_t>(out, i, r_cast<r_string_t>(s.c_str()));
       }
     }
     break;
   }
   case REALSXP: {
-    out = SHIELD(new_vec(STRSXP, n));
-    double *p_x = REAL(x);
+    std::string s;
+    out = SHIELD(new_vector<r_string_t>(n));
+    double *p_x = real_ptr(x);
     for (R_xlen_t i = 0; i < n; ++i){
       if (is_r_na(p_x[i])){
-        SET_STRING_ELT(out, i, NA_STRING);
+        set_value<r_string_t>(out, i, na::string);
       } else {
         int64_t temp = p_x[i];
         s = string_format("%lld", temp);
-        SET_STRING_ELT(out, i, make_utf8_char(s.c_str()));
+        set_value<r_string_t>(out, i, r_cast<r_string_t>(s.c_str()));
       }
     }
     break;
@@ -236,25 +229,25 @@ SEXP cpp_sset_int64(SEXP x, SEXP locs){
 
   int32_t NP = 0;
 
-  const int64_t* p_x = INTEGER64_PTR_RO(x);
+  const int64_t* p_x = integer64_ptr_ro(x);
 
   SEXP clean_locs = SHIELD(clean_indices(locs, x, false)); ++NP;
   SHIELD(locs = VECTOR_ELT(clean_locs, 0)); ++NP;
 
-  SEXP out = SHIELD(new_vec(REALSXP, Rf_xlength(locs))); ++NP;
-  int64_t* RESTRICT p_out = INTEGER64_PTR(out);
+  SEXP out = SHIELD(new_vector<double>(Rf_xlength(locs))); ++NP;
+  int64_t* RESTRICT p_out = integer64_ptr(out);
 
-  SEXP names = SHIELD(get_names(x)); ++NP;
+  SEXP names = SHIELD(get_old_names(x)); ++NP;
   SEXP out_names = SHIELD(sset_vec(names, locs, true)); ++NP;
 
-  if (Rf_xlength(x) > INTEGER_MAX){
+  if (Rf_xlength(x) > r_limits::r_int_max){
 
     int_fast64_t xn = Rf_xlength(x);
 
     int_fast64_t
     n = Rf_xlength(locs), k = 0, j;
 
-    const double* pind = REAL_RO(locs);
+    const double* pind = real_ptr_ro(locs);
 
     for (int_fast64_t i = 0; i < n; ++i){
       j = pind[i];
@@ -264,7 +257,7 @@ SEXP cpp_sset_int64(SEXP x, SEXP locs){
         YIELD(NP);
         return out2;
       } else if (j != 0){
-        p_out[k++] = (is_r_na(pind[i]) || j > xn) ? NA_INTEGER64 : p_x[j - 1];
+        p_out[k++] = (is_r_na(pind[i]) || j > xn) ? na::integer64 : p_x[j - 1];
       }
     }
 
@@ -274,7 +267,7 @@ SEXP cpp_sset_int64(SEXP x, SEXP locs){
       SHIELD(out = Rf_xlengthgets(out, k)); ++NP;
     }
 
-    set_names(out, out_names);
+    set_old_names(out, out_names);
 
     YIELD(NP);
     return out;
@@ -285,10 +278,10 @@ SEXP cpp_sset_int64(SEXP x, SEXP locs){
     xn = Rf_length(x),
       n = Rf_xlength(locs),
       k = 0,
-      na_val = NA_INTEGER,
+      na_val = na::integer,
       j;
 
-    const int *pind = INTEGER_RO(locs);
+    const int *pind = integer_ptr_ro(locs);
 
     for (unsigned int i = 0; i < n; ++i){
       j = pind[i];
@@ -301,7 +294,7 @@ SEXP cpp_sset_int64(SEXP x, SEXP locs){
         YIELD(NP);
         return out2;
       } else if (j != 0U){
-        p_out[k++] = NA_INTEGER64;
+        p_out[k++] = na::integer64;
       }
     }
 
@@ -309,7 +302,7 @@ SEXP cpp_sset_int64(SEXP x, SEXP locs){
       SHIELD(out = Rf_lengthgets(out, k)); ++NP;
     }
 
-    set_names(out, out_names);
+    set_old_names(out, out_names);
 
     YIELD(NP);
     return out;

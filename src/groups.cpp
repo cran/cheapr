@@ -5,17 +5,17 @@ SEXP cpp_group_starts(SEXP group_id, int n_groups){
 
   int n = Rf_length(group_id);
 
-  SEXP out = SHIELD(new_vec(INTSXP, n_groups));
-  const int* p_group_id = INTEGER_RO(group_id);
-  int* RESTRICT p_out = INTEGER(out);
+  SEXP out = SHIELD(vec::new_vector<int>(n_groups));
+  const int* p_group_id = integer_ptr_ro(group_id);
+  int* RESTRICT p_out = integer_ptr(out);
 
-  int fill_value = std::numeric_limits<int>::max();
+  int fill_value = r_limits::r_int_max;
 
   bool sorted = true;
 
   if (n < fill_value){
     // Initialise start locations
-    std::fill(p_out, p_out + n_groups, fill_value);
+    r_fill(out, p_out, 0, n_groups, fill_value);
 
     for (int i = 0; i < n; ++i){
       int curr_group = p_group_id[i] - 1;
@@ -26,7 +26,7 @@ SEXP cpp_group_starts(SEXP group_id, int n_groups){
 
     // This will set groups with no start locations to 0
     // (e.g. undropped factor levels)
-    std::replace(p_out, p_out + n_groups, fill_value, 0);
+    r_replace(out, p_out, 0, n_groups, fill_value, 0);
   } else {
 
     // Slightly slower method than above
@@ -34,7 +34,7 @@ SEXP cpp_group_starts(SEXP group_id, int n_groups){
     // happens to be at .Machine$integer.max
 
     // Initialise start locations
-    std::fill(p_out, p_out + n_groups, 0);
+    r_fill(out, p_out, 0, n_groups, 0);
 
     for (int i = 0; i < n; ++i){
       int curr_group = p_group_id[i] - 1;
@@ -48,23 +48,21 @@ SEXP cpp_group_starts(SEXP group_id, int n_groups){
     }
   }
 
-  SEXP r_sorted = SHIELD(as_r_scalar(sorted));
-  Rf_setAttrib(out, Rf_installChar(make_utf8_char("sorted")), r_sorted);
+  SEXP r_sorted = SHIELD(as_vector(sorted));
+  set_attr(out, r_cast<r_symbol_t>("sorted"), r_sorted);
   YIELD(2);
   return out;
 }
 
-[[cpp11::register]]
 SEXP cpp_group_counts(SEXP group_id, int n_groups){
 
   int n = Rf_length(group_id);
 
-  SEXP out = SHIELD(new_vec(INTSXP, n_groups));
-  const int* RESTRICT p_group_id = INTEGER_RO(group_id);
-  int* RESTRICT p_out = INTEGER(out);
+  // Counts initialised to zero
+  SEXP out = SHIELD(vec::new_vector<int>(n_groups, 0));
+  const int* RESTRICT p_group_id = integer_ptr_ro(group_id);
+  int* RESTRICT p_out = integer_ptr(out);
 
-  // Initialise counts
-  std::fill(p_out, p_out + n_groups, 0);
   // Count groups
   for (int i = 0; i < n; ++i) p_out[p_group_id[i] - 1]++;
 

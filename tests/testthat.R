@@ -9,4 +9,6 @@
 library(testthat)
 library(cheapr)
 
+set_threads(2)
+
 test_check("cheapr", reporter = c("check", "location"))

@@ -15,16 +15,19 @@ test_that("combining", {
   j <- factor(c("f", "g"), levels = c("f", "G", "g"))
   k <- list(10)
   # l <- list(value = 123)
-  l <- new_df(y = "ok")
+  l <- data.frame(y = "ok")
 
   objs <- named_list(A, a, b, c, d, e, f, g, h, i, j, k, l)
 
-  result <- new_list(length(objs))
+  result <- vector("list", length(objs))
   names(result) <- names(objs)
+  unnamed_objs <- unname(objs)
+
+  expect_equal(foo3(iris), foo3(iris))
 
   for (ii in seq_along(objs)){
     result <- replace_(
-      result, ii, list(a = suppressWarnings(c_(.args = sset(unname(objs), seq_len(ii)))))
+      result, ii, list(a = suppressWarnings(c_(.args = sset(unnamed_objs, seq_len(ii)))))
     )
   }
 

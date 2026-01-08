@@ -1,21 +1,39 @@
-# cheapr 1.4.0
+# cheapr 1.5.0
+
+cheapr 1.5.0 supersedes cheapr 1.4.0
+
+The C/C++ API is currently under development and a 
+stable release can be expected for cheapr 2.0.0
+
+Note: cheapr 2.0.0 will require C++20
+
+### General news
+
+- Thanks @ChampLeeTX for spotting an issue where the package 
+wasn't installing for older versions of R. This is now fixed.
+
+- A new rich set of parallelised math functions like `abs_`, `round_` and more.
+
+- New functions for setting and getting the number of threads being used.
+
+- New multi-threaded vector initialisers like `new_integer` and `new_double`. 
+
+- Plain list vectors are now never regarded as `NA` even if they contain `NA`
+elements.
+
+- Parallelisation is internally used more frequently for operations like 
+creating new vectors, combining vectors, filling, copying and replacing data.
+The default has been changed to 2. To use a different number of threads simply
+use `set_threads()`
+
+- `scm` now better detects when integer (32-bit and 64-bit) overflow occurs and
+switches to using doubles internally, returning a double value.
+
+- `if_else_` can now handle data frames and is fully SIMD parallelised.
 
 ### New features 
 
-- A rich C++ API is now available. 
-
-To make use of the API, include the API header file
-
-`#include "cheapr_api.h"` 
-
-and then link to cheapr
-
-in R package description file.
-`LinkingTo: cheapr`
-
-or directly in C++ code
-`[[cpp11::linking_to("cheapr")]]`
-
+- The C/C++ API has been re-written to use pure R C API code internally.
 
 - New function `unique_` as a cheaper alternative to `unique`.
 
@@ -58,6 +76,8 @@ attributes from a template.
 - Fixed a bug in `case` that would return incorrect results when the length of 
 the RHS was greater than 1.
 
+- Removed all non-API C entry points.
+
 ### Changes and Improvements
 
 - `sset` is no longer an S3 generic and now internally dispatches on the 
@@ -89,8 +109,15 @@ for a long while.
 
 ### Breaking changes
 
-- Matrices are converted to data frames and arrays are converted to bare vectors 
+- fastplyr versions 0.9.91 and later must depend on cheapr version 1.4.0 and 
+later. This means that you can't for example install both fastplyr 0.9.9 and 
+cheapr 1.3.2
+
+- Matrices and arrays are explicitly converted to vectors 
 when using data frames via `new_df` and other data frame constructors.
+Since the internal structure of a matrix is a vector with dimension attributes 
+it is much more efficient to treat it as a vector. 
+To work with rectangular data in cheapr it is advised to use data frames. 
 
 - `enframe_()`, `deframe_()` and `cut_numeric()` have been removed as they have
 been deprecated for a while.

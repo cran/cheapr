@@ -4,10 +4,7 @@
 #' These functions transform your variable by reference, with no copies being made.
 #' It is advisable to only use these if you know what you are doing.
 #'
-#' @param x A numeric vector.
-#' @param y A numeric vector.
-#' @param digits Number of digits to round to.
-#' @param base Logarithm base.
+#' @inheritParams math
 #'
 #' @details
 #' These functions are particularly useful for situations
@@ -37,12 +34,10 @@
 #' library(bench)
 #'
 #' x <- rnorm(2e05)
-#' options(cheapr.cores = 2)
 #' mark(
 #'   base = exp(log(abs(x))),
 #'   cheapr = set_exp(set_log(set_abs(x)))
 #' )
-#' options(cheapr.cores = 1)
 #'
 #' @rdname set_math
 #' @export
