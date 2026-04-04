@@ -1,3 +1,8 @@
+# cheapr 1.5.1
+
+Removed use of non-API functions R_MissingArg, R_UnboundValue, 
+Rf_findVar and Rf_findVarinFrame.
+
 # cheapr 1.5.0
 
 cheapr 1.5.0 supersedes cheapr 1.4.0
